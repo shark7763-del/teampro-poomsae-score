@@ -21,6 +21,7 @@ https://shark7763-del.github.io/teampro-poomsae-score/
 - 公開顯示端在公布前只顯示選手資訊、階段、J1-J5 送出狀態，不顯示分數。
 - 主控端鎖定後公布成績，顯示正確性、表現性、程序扣分及最終總分。
 - 單機訓練模式 `#/training` 可直接計算 3/5 裁判品勢分數。
+- 教練手機可透過 `#/training-display` 的 QR Code 連接電視，使用 Training TV Sync 顯示公開訓練資訊。
 
 ## 路由
 
@@ -29,6 +30,10 @@ https://shark7763-del.github.io/teampro-poomsae-score/
 - `#/judge/:roomCode/:slot`：裁判端，例如 `#/judge/ABC234/J1`。
 - `#/display/:roomCode`：公開顯示端。
 - `#/training`：單機訓練模式。
+- `#/training-display`：訓練電視等待及配對畫面。
+- `#/training-display/:displayCode`：訓練電視顯示畫面。
+- `#/training/connect/:displayCode`：手機掃描 QR Code 後的配對入口。
+- `#/training/session/:sessionId`：教練手機訓練控制頁。
 
 ## 規則版本
 
@@ -66,14 +71,26 @@ https://shark7763-del.github.io/teampro-poomsae-score/
 
 ## 連線方式
 
-目前 MVP 使用 `BroadcastChannel + localStorage` 的 Local Demo Transport：
+比賽房間目前使用 `BroadcastChannel + localStorage` 的 Local Demo Transport：
 
 - 同一台裝置的多個分頁可即時同步。
 - 裁判端送出後不能再次修改，需由主控端退回。
 - eventId 去重，sequence 防止舊事件覆蓋新狀態。
 - 重新整理後從 localStorage 恢復房間狀態。
 
-跨手機的雲端 Realtime Transport 尚未接上；目前不會用 localStorage 假裝已完成跨裝置同步。
+訓練電視同步已新增 `LocalTrainingTransport` 與 `SupabaseTrainingTransport`。未設定 Supabase 時會明確顯示「本機測試」；設定 Supabase 後才是手機與電視跨裝置同步。
+
+Supabase 設定請套用：
+
+```bash
+supabase db push
+```
+
+或手動執行：
+
+```text
+supabase/migrations/202608061_training_display_sync.sql
+```
 
 ## 本機執行
 
