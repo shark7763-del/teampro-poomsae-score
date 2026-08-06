@@ -43,7 +43,7 @@
 ## 本機執行
 
 ```bash
-cd D:\TeamPro跆拳道簡易計分系統
+cd "D:\TeamPro Poomsae Score"
 npm install
 npm run dev          # http://localhost:5173
 ```

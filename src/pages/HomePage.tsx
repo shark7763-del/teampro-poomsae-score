@@ -1,164 +1,55 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
 import { NonCertifiedNotice, Panel } from '../components/ui'
-import { loadSoloMatch } from '../storage/soloStorage'
-import { getRuleSet } from '../rules/ruleSets'
-import { formatClock } from '../timer/timer'
-
-interface InstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-}
+import { USATKD_RECOGNIZED_2026_01_01, WT_RECOGNIZED_2024_06_14 } from '../rules/profiles'
 
 export function HomePage(): React.ReactElement {
-  const rules = getRuleSet()
-  // 讀取上一場單機比賽：在初始化時同步讀 localStorage，不需要 effect
-  const [recent] = useState<ReturnType<typeof loadSoloMatch>>(() => loadSoloMatch())
-  const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null)
-
-  useEffect(() => {
-    const handler = (event: Event): void => {
-      event.preventDefault()
-      setInstallEvent(event as InstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
   return (
-    <div className="safe-area mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-4 p-4">
+    <div className="safe-area mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-4 p-4">
       <header className="pt-4">
         <p className="text-sm font-bold tracking-[0.2em] text-emerald-400">TEAMPRO</p>
-        <h1 className="text-3xl font-black tracking-tight">跆拳道簡易計分系統</h1>
+        <h1 className="text-3xl font-black tracking-tight">跆拳道品勢計分系統</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Taekwondo Score Lite · 規則版本 {rules.effectiveDate}
-          {rules.officialSourceVerified ? '' : '（待官方核對）'}
+          TeamPro Poomsae Score · 公認品勢評分核心建置中
         </p>
       </header>
 
       <NonCertifiedNotice />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link
-          to="/solo"
-          className="flex min-h-[104px] flex-col justify-center rounded-xl border-2 border-emerald-500/50 bg-emerald-600/15 p-4 transition-colors hover:bg-emerald-600/25 focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none"
-        >
-          <span className="text-xl font-black">立即開賽</span>
-          <span className="mt-1 text-sm text-slate-300">
-            沿用上次設定直接進場，可鏡射到電視，離線可用
-          </span>
-        </Link>
+      <section className="grid gap-3 sm:grid-cols-2">
+        <Panel title="目前可驗證">
+          <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-slate-300">
+            <li>WT 2024-06-14 公認品勢 Rule Profile。</li>
+            <li>USATKD 2026-01-01 公認品勢 Rule Profile。</li>
+            <li>三裁判平均與五裁判分別刪除最高、最低分。</li>
+            <li>正確性、表現性、程序扣分與同分判定純函式。</li>
+            <li>AutoResearch 固定 evaluation harness。</li>
+          </ul>
+        </Panel>
 
-        <Link
-          to="/solo?setup=1"
-          className="flex min-h-[104px] flex-col justify-center rounded-xl border-2 border-line bg-panel p-4 transition-colors hover:bg-panel-2 focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none"
-        >
-          <span className="text-xl font-black">設定新比賽</span>
-          <span className="mt-1 text-sm text-slate-300">
-            姓名、回合時間、休息時間、賽制與規則模式
-          </span>
-        </Link>
+        <Panel title="下一階段">
+          <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-slate-300">
+            <li>建立品勢專用 Training、Control、Judge、Display 頁面。</li>
+            <li>建立品勢房間事件模型與 LocalDemoTransport。</li>
+            <li>接上 QR Code、房間碼、裁判席位與公布流程。</li>
+            <li>加入手機與電視 viewport 測試。</li>
+          </ul>
+        </Panel>
+      </section>
 
-        <Link
-          to="/display"
-          className="flex min-h-[104px] flex-col justify-center rounded-xl border-2 border-sky-500/50 bg-sky-600/15 p-4 transition-colors hover:bg-sky-600/25 focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none"
-        >
-          <span className="text-xl font-black">📺 這台是電視</span>
-          <span className="mt-1 text-sm text-slate-300">
-            顯示房間代碼與 QR Code，教練用手機掃碼後即可計分
-          </span>
-        </Link>
-
-        <Link
-          to="/join"
-          className="flex min-h-[104px] flex-col justify-center rounded-xl border-2 border-line bg-panel p-4 transition-colors hover:bg-panel-2 focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none"
-        >
-          <span className="text-xl font-black">📱 手機主控（輸入房號）</span>
-          <span className="mt-1 text-sm text-slate-300">
-            掃不到 QR Code 時，改用電視上的 6 碼房間代碼加入
-          </span>
-        </Link>
-
-        <Link
-          to="/mirror"
-          className="flex min-h-[76px] flex-col justify-center rounded-xl border border-line bg-panel p-4 hover:bg-panel-2 focus-visible:ring-4 focus-visible:ring-white/60 focus-visible:outline-none"
-        >
-          <span className="text-lg font-bold">顯示端（同一台電腦第二視窗）</span>
-          <span className="text-sm text-slate-400">投影機／第二螢幕用的純計分板，不需要連線</span>
-        </Link>
-
-        {recent !== null ? (
-          <Link
-            to="/solo"
-            className="flex min-h-[76px] flex-col justify-center rounded-xl border border-line bg-panel p-4 hover:bg-panel-2"
-          >
-            <span className="text-lg font-bold">繼續上一場單機比賽</span>
-            <span className="text-sm text-slate-400">
-              {recent.state.config.blueName} {recent.state.scores.blueScore} :{' '}
-              {recent.state.scores.redScore} {recent.state.config.redName} · 第{' '}
-              {recent.state.currentRound} 回合 ·{' '}
-              {formatClock(recent.state.timer.remainingMsAtStart, false)}
-            </span>
-          </Link>
-        ) : (
-          <div className="flex min-h-[76px] flex-col justify-center rounded-xl border border-dashed border-line p-4 text-sm text-slate-500">
-            尚無最近一次單機比賽
-          </div>
-        )}
-      </div>
-
-      {installEvent !== null && (
-        <button
-          type="button"
-          onClick={() => {
-            void installEvent.prompt()
-            setInstallEvent(null)
-          }}
-          className="min-h-[56px] rounded-xl border-2 border-emerald-500/50 bg-emerald-600/20 font-bold"
-        >
-          安裝到手機主畫面（PWA）
-        </button>
-      )}
-
-      <Panel title="系統使用說明">
-        <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-slate-300">
-          <li>
-            <b>一台手機</b>：點「單手機計分」即可開始，將手機以 HDMI／AirPlay
-            投到電視後，開啟「鏡射模式」隱藏操作面板。
-          </li>
-          <li>
-            <b>電視＋手機（最常用）</b>：先在電視瀏覽器點「這台是電視」，畫面會出現房間代碼與 QR
-            Code；教練用手機掃碼進入主控端，設定選手後開賽。 電視只負責顯示大字比分，
-            計分、計時全在手機上。
-          </li>
-          <li>
-            <b>兩台裁判手機</b>：主控端點左上角的「房間 · 連線」，切換為雙裁判並讓裁判 A、B 各自掃描
-            QR Code。兩人在確認時間窗內按下<b>相同選手、相同技術</b>才會正式加分一次。
-          </li>
-        </ol>
-        <p className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
-          <b>三回合兩勝制</b>：每一回合分數<b>歸零重新計算</b>，先贏得 2 個回合者獲勝， 因此 2:0
-          領先時<b>不會進行第三回合</b>。 回合平手時依序比較：旋轉技術得分 → 高分值技術數量 →
-          仍相同則
-          <b>直接由你依優勢判定</b>。 單一回合累積 {rules.round.gamjeomLimitPerRound} 次 Gam-jeom
-          或分差達 {rules.round.pointGapThreshold} 分時，該回合提前結束。
-        </p>
-        <p className="mt-2 rounded-lg bg-panel-2 p-3 text-xs text-slate-400">
-          分值依 {rules.name}：正拳 {rules.basePoints.BODY_PUNCH}、身體踢擊{' '}
-          {rules.basePoints.BODY_KICK}、頭部踢擊 {rules.basePoints.HEAD_KICK}、旋轉技術為基本分 ×
-          {rules.turningMultiplier}（旋身 {rules.basePoints.BODY_KICK * rules.turningMultiplier}
-          、旋頭 {rules.basePoints.HEAD_KICK * rules.turningMultiplier}）。一般 Gam-jeom 對手 +
-          {rules.gamjeom.normalOpponentPoints}；回合最後 10 秒消極行為之 Gam-jeom 對手 +
-          {rules.gamjeom.lastSecondsOpponentPoints}，且只記 1 次 Gam-jeom。
-          <br />
-          <b>
-            雙裁判確認時間窗（預設 {rules.trainingDefaults.confirmationWindowMs}{' '}
-            毫秒）為本系統的訓練操作參數，並非 World Taekwondo 規定的秒數。
-          </b>
-        </p>
+      <Panel title="已建立的規則版本">
+        <div className="grid gap-3 text-sm sm:grid-cols-2">
+          {[WT_RECOGNIZED_2024_06_14, USATKD_RECOGNIZED_2026_01_01].map((profile) => (
+            <div key={profile.id} className="rounded-lg border border-line bg-panel-2 p-3">
+              <p className="font-bold text-white">{profile.name}</p>
+              <p className="mt-1 text-slate-400">{profile.organization}</p>
+              <p className="mt-1 text-slate-400">生效日：{profile.effectiveDate}</p>
+              <p className="mt-1 text-slate-400">支援裁判數：{profile.supportedJudgeCounts.join(' / ')}</p>
+            </div>
+          ))}
+        </div>
       </Panel>
 
       <footer className="pb-6 text-center text-xs text-slate-600">
-        TeamPro Taekwondo Score Lite · 訓練與模擬用途
+        TeamPro Poomsae Score · 訓練、模擬賽及賽事輔助工具
       </footer>
     </div>
   )
