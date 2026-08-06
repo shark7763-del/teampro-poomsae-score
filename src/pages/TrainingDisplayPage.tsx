@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router'
+import { AppLogo } from '../components/AppLogo'
 import { QrCode } from '../components/QrCode'
 import { Notice } from '../components/ui'
 import { elapsedSeconds, timerStatusText } from '../training/state'
@@ -22,7 +23,7 @@ export function TrainingDisplayPage(): React.ReactElement {
   if (state === null) {
     return (
       <main className="training-tv-shell">
-        <p className="brand">TEAMPRO</p>
+        <AppLogo />
         <h1>訓練顯示器啟動中</h1>
         <p className="display-meta">{connectionStatus}</p>
       </main>
@@ -36,7 +37,7 @@ export function TrainingDisplayPage(): React.ReactElement {
   if (state.options.hidden) {
     return (
       <main className="training-tv-shell">
-        <p className="brand">TEAMPRO</p>
+        <AppLogo />
         <h1>顯示已隱藏</h1>
         <p className="display-meta">等待教練手機重新開啟畫面</p>
       </main>
@@ -58,7 +59,7 @@ function TrainingDisplayWaiting({
     <main className="training-tv-shell">
       <section className="training-tv-wait">
         <div>
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>Training Display</h1>
           <p className="display-meta">等待教練手機連接</p>
         </div>
@@ -87,7 +88,7 @@ function TrainingDisplayScreen({
     return (
       <main className="training-tv-shell">
         <section className="training-tv-result">
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>{state.athleteName}</h1>
           <p className="display-meta">
             {state.teamName} · {state.poomsaeName}
@@ -115,7 +116,7 @@ function TrainingDisplayScreen({
     <main className="training-tv-shell">
       <section className="training-tv-live">
         <div>
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>{state.athleteName}</h1>
           <p className="display-meta">
             {state.teamName} · {state.poomsaeName} · {state.phase}

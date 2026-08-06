@@ -88,6 +88,29 @@ button {
   letter-spacing: 6px;
 }
 
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: #00e0a4;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 4px;
+}
+
+.app-logo img {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.app-logo.compact img {
+  width: 42px;
+  height: 42px;
+}
+
 h1 {
   margin: 0;
   font-size: clamp(34px, 5vw, 56px);

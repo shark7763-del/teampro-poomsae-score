@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { AppLogo } from '../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import { formatScore } from '../poomsae/scoring'
 import { elapsedSeconds } from '../training/state'
@@ -35,7 +36,7 @@ export function TrainingControllerPage(): React.ReactElement {
     <main className="judge-shell">
       <section className="judge-header">
         <div>
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>教練訓練控制</h1>
           <p className="subtitle">手機控制訓練，電視只顯示公開資訊</p>
         </div>

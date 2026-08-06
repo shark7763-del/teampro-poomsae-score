@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
+import { AppLogo } from '../components/AppLogo'
 import { QrCode } from '../components/QrCode'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import type { JudgeScoreInput } from '../poomsae/scoring'
@@ -19,7 +20,7 @@ export function ControlEntryPage() {
     <main className="page-shell">
       <section className="hero-row">
         <div>
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>跆拳道品勢計分系統</h1>
           <p className="subtitle">獨立品勢系統。控制端建立房間後，裁判以 QR Code 加入。</p>
         </div>
@@ -79,7 +80,7 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
     <main className="page-shell">
       <section className="hero-row">
         <div>
-          <p className="brand">CONTROL</p>
+          <AppLogo />
           <h1>主控端 {room.roomCode}</h1>
           <p className="subtitle">{room.status}</p>
         </div>
@@ -250,7 +251,7 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
     <main className="judge-shell">
       <section className="judge-header">
         <div>
-          <p className="brand">JUDGE</p>
+          <AppLogo />
           <h1>{judgeSlot} 裁判端</h1>
           <p className="subtitle">
             房間 {room.roomCode} · {room.athleteName} · {room.poomsaeName}
@@ -340,7 +341,7 @@ function DisplayRoom({ roomCode }: { roomCode: string }) {
   return (
     <main className="display-shell">
       <section>
-        <p className="brand">TEAMPRO</p>
+        <AppLogo />
         <h1>{room.athleteName}</h1>
         <p className="display-meta">
           {room.teamName} · {room.poomsaeName} · {room.status}

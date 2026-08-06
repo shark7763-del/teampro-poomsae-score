@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { AppLogo } from '../../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../../components/ui'
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../../rules/profiles'
 import type { JudgeScoreInput } from '../../poomsae/scoring'
@@ -108,7 +109,7 @@ export function Calculator(): React.ReactElement {
 export function Header({ subtitle }: { subtitle: string }): React.ReactElement {
   return (
     <header className="pt-3">
-      <p className="text-sm font-bold tracking-[0.2em] text-emerald-400">TEAMPRO</p>
+      <AppLogo compact />
       <h1 className="text-3xl font-black tracking-tight">跆拳道品勢計分系統</h1>
       <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
     </header>

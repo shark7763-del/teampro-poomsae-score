@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router'
+import { AppLogo } from '../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import { useTrainingController } from '../training/useTrainingRealtime'
 
@@ -30,7 +31,7 @@ export function TrainingConnectPage(): React.ReactElement {
     <main className="page-shell">
       <section className="hero-row">
         <div>
-          <p className="brand">TEAMPRO</p>
+          <AppLogo />
           <h1>連接訓練電視</h1>
           <p className="subtitle">顯示器代碼 {normalizedCode}</p>
         </div>
