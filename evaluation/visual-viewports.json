@@ -1,0 +1,7 @@
+[
+  { "name": "mobile-small", "width": 360, "height": 800 },
+  { "name": "iphone", "width": 390, "height": 844 },
+  { "name": "mobile-large", "width": 430, "height": 932 },
+  { "name": "display-hd", "width": 1920, "height": 1080 },
+  { "name": "display-small", "width": 1366, "height": 768 }
+]

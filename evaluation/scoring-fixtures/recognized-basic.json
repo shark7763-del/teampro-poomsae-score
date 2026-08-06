@@ -1,0 +1,9 @@
+{
+  "profile": "WT_RECOGNIZED_2024_06_14",
+  "judgeCount": 5,
+  "expected": {
+    "accuracy": 38,
+    "presentation": 58,
+    "total": 96
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "commit": "2f83a47",
+  "total": 0,
+  "ruleCorrectness": 0,
+  "workflowSuccess": 0,
+  "realtimeReliability": 0,
+  "resilience": 0,
+  "usability": 0,
+  "maintainability": 0,
+  "notes": "Baseline before poomsae-specific engine and evaluation harness."
+}
