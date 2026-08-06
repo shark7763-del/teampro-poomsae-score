@@ -12,12 +12,13 @@ export function App(): React.ReactElement {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<ControlEntryPage />} />
+        <Route path="/training" element={<HomePage />} />
         <Route path="/control" element={<ControlEntryPage />} />
         <Route path="/control/:roomCode" element={<ControlPage />} />
         <Route path="/judge/:roomCode/:slot" element={<JudgePage />} />
         <Route path="/display/:roomCode" element={<DisplayPage />} />
-        <Route path="*" element={<HomePage />} />
+        <Route path="*" element={<ControlEntryPage />} />
       </Routes>
     </HashRouter>
   )
