@@ -43,6 +43,21 @@ export function ControlEntryPage() {
           </div>
         </div>
       </Panel>
+
+      <Panel title="加入 QR Code">
+        <div className="qr-list">
+          <div className="qr-card">
+            <QrCode value={appLink(`/display/${roomCode}`)} />
+            <strong>公開顯示端</strong>
+          </div>
+          {['J1', 'J2', 'J3', 'J4', 'J5'].map((slot) => (
+            <div className="qr-card" key={slot}>
+              <QrCode value={appLink(`/judge/${roomCode}/${slot}`)} />
+              <strong>{slot} 裁判端</strong>
+            </div>
+          ))}
+        </div>
+      </Panel>
     </main>
   )
 }
