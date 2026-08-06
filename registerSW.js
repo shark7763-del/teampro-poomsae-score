@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/teampro-poomsae-score/sw.js', { scope: '/teampro-poomsae-score/' })})}
