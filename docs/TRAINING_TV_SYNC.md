@@ -18,6 +18,16 @@ When Supabase env vars are present, the TV creates a sanitized snapshot in `trai
 
 When Supabase is missing, the app falls back to `LocalTrainingTransport` and marks the UI as `本機測試`. That mode is only for same-device browser tabs.
 
+## Supabase Setup
+
+1. Create a Supabase project.
+2. Copy Project URL and anon public key into `.env`.
+3. Apply `supabase/migrations/202608061_training_display_sync.sql`.
+4. In Realtime settings, keep private channel authorization enabled.
+5. Deploy with the same two frontend env vars.
+
+Do not use or expose the service role key in this app.
+
 ## Public Data
 
 Only sanitized display state is sent to the TV. `sanitizeTrainingDisplayState` removes private coach notes and suppresses issue details unless the coach enables public issue display.

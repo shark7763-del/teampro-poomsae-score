@@ -12,6 +12,8 @@ create table if not exists public.training_display_snapshots (
 create index if not exists training_display_snapshots_display_code_idx
   on public.training_display_snapshots (display_code, updated_at desc);
 
+grant select, insert, update on public.training_display_snapshots to anon;
+
 alter table public.training_display_snapshots enable row level security;
 
 drop policy if exists "training display snapshots are readable by anon" on public.training_display_snapshots;
@@ -47,7 +49,31 @@ create policy "training display snapshots can be updated by anon"
   );
 
 -- Supabase Dashboard requirements:
+-- Realtime Authorization:
+-- Supabase private channels authorize Broadcast and Presence through RLS policies
+-- on realtime.messages. These policies allow anon clients to read/write only
+-- channels with the training-display:<sessionId> topic prefix.
+drop policy if exists "training display realtime read" on realtime.messages;
+create policy "training display realtime read"
+  on realtime.messages
+  for select
+  to anon
+  using (
+    realtime.topic() like 'training-display:%'
+    and realtime.messages.extension in ('broadcast', 'presence')
+  );
+
+drop policy if exists "training display realtime write" on realtime.messages;
+create policy "training display realtime write"
+  on realtime.messages
+  for insert
+  to anon
+  with check (
+    realtime.topic() like 'training-display:%'
+    and realtime.messages.extension in ('broadcast', 'presence')
+  );
+
+-- Supabase Dashboard requirements:
 -- 1. Realtime must be enabled for Broadcast and Presence.
--- 2. Realtime Authorization must allow authenticated anon clients to join private
---    channels named training-display:<sessionId>.
+-- 2. Realtime Settings must keep private channel authorization enabled.
 -- 3. Frontend must use only VITE_SUPABASE_ANON_KEY. Never expose service role keys.

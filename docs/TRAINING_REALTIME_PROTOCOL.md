@@ -37,6 +37,11 @@ Supabase setup:
 
 1. Apply `supabase/migrations/202608061_training_display_sync.sql`.
 2. Enable Realtime Broadcast and Presence.
-3. Configure Realtime Authorization for private channels named `training-display:*`.
+3. Keep Realtime private channel authorization enabled.
 4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 5. Never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend code or `VITE_*`.
+
+The migration also creates `realtime.messages` policies for anon clients on
+`training-display:%` topics. Supabase documents that private Broadcast and
+Presence authorization is controlled through RLS policies on
+`realtime.messages`.
