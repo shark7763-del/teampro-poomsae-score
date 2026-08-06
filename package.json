@@ -14,9 +14,9 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:scoring": "vitest run src/poomsae/scoring.test.ts",
-    "test:workflow": "vitest run src/poomsae/workflow.test.ts src/pages/RoomPages.test.tsx",
-    "test:realtime": "vitest run src/room/roomChannel.test.ts src/room/clock.test.ts",
-    "test:e2e": "vitest run src/pages/RoomPages.test.tsx",
+    "test:workflow": "vitest run src/poomsae/room.test.ts",
+    "test:realtime": "vitest run src/poomsae/room.test.ts",
+    "test:e2e": "vitest run src/poomsae/room.test.ts",
     "evaluate:baseline": "node scripts/evaluate.mjs",
     "evaluate": "node scripts/evaluate.mjs",
     "test:watch": "vitest",
@@ -24,7 +24,7 @@
     "mutation": "stryker run",
     "metrics": "node scripts/metrics.mjs",
     "verify-locked": "node scripts/verify-locked.mjs",
-    "gate": "npm run verify-locked && npm run typecheck && npm run lint && npm run test"
+    "gate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

@@ -14,8 +14,16 @@
 
 ## Current Experiment
 
-Experiment `E003` adds LocalDemo room workflow pages: `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, and `#/display/:roomCode`. It supports same-browser multi-tab control, judge submission, score locking, publication, judge return/audit log, duplicate event protection, and stale sequence rejection.
+Experiment `E004` removes old sparring UI/code from this repository and leaves a focused standalone poomsae system. The current app routes are `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, `#/display/:roomCode`, and `#/training`.
+
+Validation on 2026-08-06:
+
+- `npm run typecheck`: pass
+- `npm run lint`: pass
+- `npm run test`: pass, 2 files / 7 tests
+- `npm run build`: pass
+- `npm run evaluate`: 75/100
 
 ## Next Suggested Experiment
 
-Next step: replace LocalDemoTransport with the existing Supabase Realtime transport adapter while preserving the same event envelope and privacy rules.
+Next step: add a real cloud Realtime Transport adapter for cross-phone use while preserving the same event envelope, judge privacy, duplicate-event protection, and sequence checks.

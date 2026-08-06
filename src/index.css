@@ -1,15 +1,6 @@
 @import 'tailwindcss';
 
-/*
- * TeamPro Poomsae Score — 全域樣式
- * 設計目標：體育館高亮環境可讀、10 公尺外可辨識、避免誤觸。
- */
-
 @theme {
-  --color-blue-side: #1d6fe0;
-  --color-blue-side-dark: #0b3f8c;
-  --color-red-side: #e0342c;
-  --color-red-side-dark: #8c130e;
   --color-ink: #05070c;
   --color-panel: #10151f;
   --color-panel-2: #182031;
@@ -19,31 +10,27 @@
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  background-color: var(--color-ink);
-  color: #f4f7ff;
+  background: #05070c;
+  color: #f8fafc;
   font-family:
     'Noto Sans TC',
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    'PingFang TC',
     'Microsoft JhengHei',
     sans-serif;
-  /* 防止長按選字與 iOS 點兩下縮放影響操作 */
   -webkit-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;
   touch-action: manipulation;
-  overscroll-behavior: none;
 }
 
-/* 允許輸入框正常選取 */
 input,
+select,
 textarea {
   -webkit-user-select: text;
   user-select: text;
@@ -54,60 +41,288 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 分數用等寬數字，避免跳動 */
+.safe-area {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
 
-/* 安全區域（瀏海機／全螢幕） */
-.safe-area {
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-top: env(safe-area-inset-top);
+.page-shell,
+.judge-shell,
+.display-shell {
+  width: min(100% - 24px, 1320px);
+  margin: 0 auto;
+  padding: 24px 0 40px;
 }
 
-/* 得分浮出動畫：≤800ms 且不遮住總分 */
-@keyframes score-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) scale(0.85);
-  }
-  25% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  75% {
-    opacity: 1;
-    transform: translateY(-10px) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-40px) scale(0.95);
-  }
+.judge-shell {
+  width: min(100% - 16px, 560px);
+  padding-bottom: 104px;
 }
 
-.animate-score-pop {
-  animation: score-pop 800ms ease-out forwards;
+.display-shell {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  gap: 28px;
 }
 
-@keyframes press-glow {
-  from {
-    box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55);
+.hero-row,
+.judge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.brand {
+  margin: 0 0 4px;
+  color: #00e0a4;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 6px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 950;
+  line-height: 1.08;
+}
+
+.subtitle,
+.muted,
+.display-meta {
+  color: #a8c3e8;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 18px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #c8dcff;
+  font-weight: 800;
+}
+
+.field select,
+.field input {
+  min-height: 56px;
+  border: 1px solid #2a3346;
+  border-radius: 8px;
+  background: #182031;
+  color: white;
+  padding: 0 14px;
+  font-size: 16px;
+  outline: none;
+}
+
+.segmented,
+.button-row,
+.stepper-row {
+  display: flex;
+  gap: 10px;
+}
+
+.segmented button,
+.primary-link,
+.ghost-link {
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 2px solid #2a3346;
+  padding: 0 18px;
+  color: white;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.segmented button {
+  flex: 1;
+  background: #182031;
+}
+
+.segmented .active,
+.primary-link {
+  border-color: #00c991;
+  background: #079b70;
+}
+
+.ghost-link {
+  background: #10151f;
+}
+
+.align-end {
+  align-items: end;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.qr-list,
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 14px;
+}
+
+.qr-card,
+.status-pill {
+  border: 1px solid #2a3346;
+  border-radius: 8px;
+  background: #182031;
+  padding: 12px;
+}
+
+.qr-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.action-stack {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.status-pill {
+  display: grid;
+  gap: 8px;
+}
+
+.score-readout,
+.component-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.score-readout strong,
+.component-row strong {
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+}
+
+.judge-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.deduct {
+  min-height: 112px;
+  border-radius: 8px;
+  border: 3px solid transparent;
+  color: white;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.deduct:disabled {
+  opacity: 0.45;
+}
+
+.minor {
+  border-color: #ffb020;
+  background: #d97706;
+}
+
+.major {
+  border-color: #ff4d6d;
+  background: #be123c;
+}
+
+.undo {
+  grid-column: 1 / -1;
+  min-height: 64px;
+  border-color: #2a3346;
+  background: #182031;
+}
+
+.component-list {
+  display: grid;
+  gap: 14px;
+}
+
+.sticky-submit {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 10;
+}
+
+.display-status,
+.score-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.display-judge,
+.score-summary > div {
+  border: 1px solid #2a3346;
+  border-radius: 8px;
+  background: #10151f;
+  padding: 18px;
+}
+
+.display-judge strong,
+.score-summary strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(30px, 5vw, 64px);
+  font-variant-numeric: tabular-nums;
+}
+
+.score-summary .final {
+  border-color: #00c991;
+  background: #063a2f;
+}
+
+@media (max-width: 820px) {
+  .hero-row,
+  .judge-header,
+  .button-row {
+    flex-direction: column;
   }
-  to {
-    box-shadow: 0 0 0 18px rgb(255 255 255 / 0);
+
+  .setup-grid,
+  .two-column {
+    grid-template-columns: 1fr;
   }
-}
 
-.animate-press-glow {
-  animation: press-glow 450ms ease-out;
-}
+  .segmented {
+    flex-direction: column;
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-score-pop,
-  .animate-press-glow {
-    animation-duration: 1ms;
+  .score-readout,
+  .component-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

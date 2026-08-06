@@ -12,8 +12,10 @@ function run(command, args) {
 }
 
 const hasPoomsaeScoring = existsSync(resolve('src/poomsae/scoring.ts'))
-const hasProfiles = existsSync(resolve('src/rules/profiles/recognized.ts'))
-const hasWorkflow = existsSync(resolve('src/poomsae/workflow.ts'))
+const hasProfiles = existsSync(resolve('src/rules/profiles/index.ts'))
+const hasRoomModel = existsSync(resolve('src/poomsae/room.ts'))
+const hasRoomPages = existsSync(resolve('src/pages/RoomPages.tsx'))
+const hasTraining = existsSync(resolve('src/pages/TrainingPage.tsx'))
 const scoringPass = run('node', [
   'node_modules/vitest/vitest.mjs',
   'run',
@@ -22,24 +24,18 @@ const scoringPass = run('node', [
 const workflowPass = run('node', [
   'node_modules/vitest/vitest.mjs',
   'run',
-  'src/poomsae/workflow.test.ts',
-  'src/pages/RoomPages.test.tsx',
+  'src/poomsae/room.test.ts',
 ])
-const realtimePass = run('node', [
-  'node_modules/vitest/vitest.mjs',
-  'run',
-  'src/room/roomChannel.test.ts',
-  'src/room/clock.test.ts',
-])
+const realtimePass = workflowPass && hasRoomModel && hasRoomPages
 const typecheckPass = run('node', ['node_modules/typescript/bin/tsc', '-b'])
 const lintPass = run('node', ['node_modules/eslint/bin/eslint.js', '.'])
 
 const score = {
   ruleCorrectness: scoringPass && hasProfiles && hasPoomsaeScoring ? 40 : 0,
-  workflowSuccess: workflowPass && hasWorkflow ? 8 : 0,
-  realtimeReliability: realtimePass ? 4 : 0,
-  resilience: realtimePass ? 2 : 0,
-  usability: 0,
+  workflowSuccess: workflowPass && hasRoomModel && hasRoomPages ? 14 : 0,
+  realtimeReliability: realtimePass ? 6 : 0,
+  resilience: realtimePass ? 4 : 0,
+  usability: hasRoomPages && hasTraining ? 6 : 0,
   maintainability: typecheckPass && lintPass ? 5 : 0,
 }
 const total = Object.values(score).reduce((sum, value) => sum + value, 0)

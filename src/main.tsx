@@ -3,10 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
 
-const container = document.getElementById('root')
-if (container === null) throw new Error('找不到 #root 掛載點')
+const root = document.getElementById('root')
+if (root === null) throw new Error('Root element not found')
 
-createRoot(container).render(
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,

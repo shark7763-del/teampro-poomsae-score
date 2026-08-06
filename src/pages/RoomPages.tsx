@@ -1,615 +1,374 @@
-import { useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router'
-import { Scoreboard } from '../components/Scoreboard'
-import { ControlPanel } from '../components/ControlPanel'
-import { SideControls } from '../components/ScoreButtons'
-import { RoundEndPanel } from '../components/RoundEndPanel'
-import { SetupPanel } from '../components/SetupPanel'
+import { useMemo, useState } from 'react'
+import { Link, Navigate, useParams } from 'react-router'
 import { QrCode } from '../components/QrCode'
-import { ActionButton, NonCertifiedNotice } from '../components/ui'
-import { useNow } from '../hooks/useNow'
-import { useFullscreen, useWakeLock } from '../hooks/useFullscreen'
-import { useRoomHost, useRoomClient } from '../room/useRoom'
-import { createRoomConfig, generateRoomCode } from '../room/roomStorage'
-import { displayLink, judgeLink, operatorLink, shortHostUrl } from '../room/links'
-import type { RoomTransport } from '../room/roomChannel'
-import { createMatchState } from '../match/matchCore'
-import { computeRemainingMs } from '../timer/timer'
-import { findLastReversibleEvent } from '../rules/ruleEngine'
-import { getRuleSet } from '../rules/ruleSets'
-import { loadPreferences, savePreferences } from '../storage/preferences'
-import type { ActionType, AthleteSide, JudgeSeat, PressOutcome } from '../types'
+import { Button, Notice, Panel, TextField } from '../components/ui'
+import type { JudgeScoreInput } from '../poomsae/scoring'
+import { computeJudgeScore, formatScore } from '../poomsae/scoring'
+import { generateRoomCode, judgeSlots, scoreRoom } from '../poomsae/room'
+import { useRoom } from '../poomsae/useRoom'
+import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../rules/profiles'
 
-function useRoomCode(): string {
-  const params = useParams()
-  return (typeof params.roomCode === 'string' ? params.roomCode : '').toUpperCase()
+function appLink(path: string): string {
+  return `${window.location.origin}${window.location.pathname}#${path}`
 }
 
-/** 目前用哪一種方式連線，任何多裝置頁面都必須誠實顯示 */
-function TransportBadge({
-  transport,
-  ready,
-  className = '',
-}: {
-  transport: RoomTransport
-  ready: boolean
-  className?: string
-}): React.ReactElement {
-  const label =
-    transport === 'cloud'
-      ? ready
-        ? '雲端連線'
-        : '雲端連線中…'
-      : transport === 'local'
-        ? '本機模擬（僅同一瀏覽器）'
-        : '此瀏覽器不支援連線'
-  const tone =
-    transport === 'cloud'
-      ? ready
-        ? 'bg-emerald-600/30 text-emerald-300'
-        : 'bg-amber-600/30 text-amber-200'
-      : 'bg-amber-600/30 text-amber-200'
-  return <span className={`rounded px-2 py-0.5 font-bold ${tone} ${className}`}>{label}</span>
-}
+export function ControlEntryPage() {
+  const [roomCode, setRoomCode] = useState(generateRoomCode())
 
-function LocalModeWarning(): React.ReactElement {
   return (
-    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-      ⚠️ <b>尚未設定雲端連線</b>，目前只有<b>同一台裝置的同一個瀏覽器</b>能互通， 用另一支手機掃 QR
-      Code 會連不上。 請在專案根目錄的 <code>.env</code> 填入 <code>VITE_SUPABASE_URL</code> 與{' '}
-      <code>VITE_SUPABASE_ANON_KEY</code> 後重新建置。
-    </p>
+    <main className="page-shell">
+      <section className="hero-row">
+        <div>
+          <p className="brand">TEAMPRO</p>
+          <h1>跆拳道品勢計分系統</h1>
+          <p className="subtitle">獨立品勢系統。控制端建立房間後，裁判以 QR Code 加入。</p>
+        </div>
+        <Link className="ghost-link" to="/training">
+          單機訓練模式
+        </Link>
+      </section>
+
+      <Notice>本系統供訓練、模擬賽及賽事輔助使用，並非 WT 認證競賽設備。</Notice>
+
+      <Panel title="建立房間">
+        <div className="setup-grid">
+          <TextField label="房間碼" value={roomCode} onChange={(value) => setRoomCode(value.toUpperCase())} />
+          <div className="button-row align-end">
+            <Button tone="secondary" onClick={() => setRoomCode(generateRoomCode())}>
+              重新產生
+            </Button>
+            <Link className="primary-link" to={`/control/${roomCode}`}>
+              進入主控端
+            </Link>
+          </div>
+        </div>
+      </Panel>
+    </main>
   )
 }
 
-/* ================================================================== */
-/* 電視顯示端                                                          */
-/* ================================================================== */
-
-/**
- * 電視端。
- *
- * 電視是現場最穩定、最早打開的那一台，所以由它產生房間代碼並顯示 QR Code；
- * 教練用手機掃碼就直接進入主控端，不需要在電視上打字。
- */
-export function DisplayPage(): React.ReactElement {
-  const code = useRoomCode()
-  const [generated] = useState(() => generateRoomCode())
-  if (code === '') return <Navigate to={`/display/${generated}`} replace />
-  return <TvDisplay roomCode={code} />
+export function ControlPage() {
+  const { roomCode } = useParams()
+  if (!roomCode) return <Navigate to="/control" replace />
+  return <ControlRoom roomCode={roomCode.toUpperCase()} />
 }
 
-function TvDisplay({ roomCode }: { roomCode: string }): React.ReactElement {
-  const now = useNow(100)
-  const { snapshot, connected, transport, ready, clockOffsetMs } = useRoomClient(
-    roomCode,
-    'DISPLAY',
-    null,
-  )
-  const { isFullscreen, toggle } = useFullscreen()
-  useWakeLock(true)
+function ControlRoom({ roomCode }: { roomCode: string }) {
+  const { state: room, publish } = useRoom(roomCode)
+  const result = scoreRoom(room)
+  const profile = RULE_PROFILES[room.profileId] ?? WT_RECOGNIZED_2024_06_14
+  const slots = judgeSlots(room.judgeCount)
+  const completeCount = slots.filter((slot) => room.judgeScores[slot]).length
 
-  const match = snapshot?.match ?? null
+  return (
+    <main className="page-shell">
+      <section className="hero-row">
+        <div>
+          <p className="brand">CONTROL</p>
+          <h1>主控端 {room.roomCode}</h1>
+          <p className="subtitle">{room.status}</p>
+        </div>
+        <div className="button-row">
+          <Link className="ghost-link" to={`/display/${room.roomCode}`}>
+            顯示端
+          </Link>
+          <Link className="ghost-link" to="/training">
+            訓練模式
+          </Link>
+        </div>
+      </section>
 
-  const fullscreenButton = (
-    <button
-      type="button"
-      onClick={toggle}
-      className="rounded-lg border border-line bg-panel-2/80 px-3 py-2 text-sm font-bold text-slate-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-    >
-      {isFullscreen ? '離開全螢幕' : '全螢幕'}
-    </button>
-  )
-
-  if (match === null) {
-    return (
-      <div className="safe-area flex min-h-dvh w-full flex-col justify-center gap-6 p-6">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-8 md:flex-row md:items-center md:justify-center">
-          <QrCode
-            value={operatorLink(roomCode)}
-            label="用手機掃我開始計分"
-            size={240}
-            showCopy={false}
+      <Panel title="賽事設定">
+        <div className="setup-grid">
+          <label className="field">
+            <span>規則版本</span>
+            <select
+              value={room.profileId}
+              onChange={(event) => publish({ type: 'UPDATE_SETTINGS', patch: { profileId: event.target.value } })}
+            >
+              {Object.values(RULE_PROFILES).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {item.effectiveDate}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="field">
+            <span>裁判數</span>
+            <div className="segmented">
+              {[3, 5].map((count) => (
+                <button
+                  key={count}
+                  className={room.judgeCount === count ? 'active' : ''}
+                  onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { judgeCount: count as 3 | 5 } })}
+                >
+                  {count} 位裁判
+                </button>
+              ))}
+            </div>
+          </div>
+          <TextField
+            label="選手姓名"
+            value={room.athleteName}
+            onChange={(athleteName) => publish({ type: 'UPDATE_SETTINGS', patch: { athleteName } })}
           />
-
-          <div className="flex flex-col items-center gap-2 md:items-start">
-            <p className="text-sm font-bold tracking-[0.3em] text-emerald-400">
-              TEAMPRO 跆拳道計分
-            </p>
-            <p className="text-lg text-slate-300">房間代碼</p>
-            <p className="tabular text-[clamp(3.5rem,12vw,9rem)] leading-none font-black tracking-[0.15em]">
-              {roomCode}
-            </p>
-            <p className="max-w-md text-center text-sm text-slate-400 md:text-left">
-              手機無法掃描時，請在手機瀏覽器開啟 <b className="text-slate-200">{shortHostUrl()}</b>
-              ， 點「手機主控」後輸入上面的房間代碼。
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <TransportBadge transport={transport} ready={ready} />
-              {fullscreenButton}
-              <Link to="/" className="px-2 py-2 text-slate-400 underline">
-                回首頁
-              </Link>
+          <TextField
+            label="單位"
+            value={room.teamName}
+            onChange={(teamName) => publish({ type: 'UPDATE_SETTINGS', patch: { teamName } })}
+          />
+          <TextField
+            label="指定品勢"
+            value={room.poomsaeName}
+            onChange={(poomsaeName) => publish({ type: 'UPDATE_SETTINGS', patch: { poomsaeName } })}
+          />
+          <div className="field">
+            <span>程序扣分</span>
+            <div className="stepper-row">
+              <Button
+                tone="secondary"
+                onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { procedureDeductions: room.procedureDeductions - 3 } })}
+              >
+                -0.3
+              </Button>
+              <strong>{formatScore(room.procedureDeductions)}</strong>
+              <Button
+                tone="secondary"
+                onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { procedureDeductions: room.procedureDeductions + 3 } })}
+              >
+                +0.3
+              </Button>
             </div>
           </div>
         </div>
+      </Panel>
 
-        {transport !== 'cloud' && (
-          <div className="mx-auto w-full max-w-3xl">
-            <LocalModeWarning />
-          </div>
-        )}
-        <div className="mx-auto w-full max-w-3xl">
-          <NonCertifiedNotice />
-        </div>
-      </div>
-    )
-  }
-
-  const judges = (snapshot?.presences ?? []).filter((p) => p.role === 'JUDGE')
-  // 剩餘時間必須用主控端的時間軸換算，否則兩台裝置的系統時鐘差幾秒就會對不起來
-  const hostNow = now + clockOffsetMs
-
-  return (
-    <div className="relative h-dvh w-full">
-      <Scoreboard
-        state={match}
-        remainingMs={computeRemainingMs(match.timer, hostNow)}
-        flash={null}
-        statusSlot={
-          <div className="flex flex-wrap items-center justify-center gap-1 text-[clamp(0.5rem,1.5vh,0.8rem)]">
-            <span
-              className={`rounded px-2 py-0.5 font-bold ${
-                connected ? 'bg-emerald-600/30 text-emerald-300' : 'bg-rose-600 text-white'
-              }`}
-            >
-              {connected ? `房間 ${roomCode}` : '主控端未連線，顯示最後正式比分'}
-            </span>
-            {judges.map((judge) => (
-              <span
-                key={judge.deviceId}
-                className="rounded bg-emerald-600/30 px-2 py-0.5 font-bold text-emerald-300"
-              >
-                裁判{judge.judgeSeat} 在線
-              </span>
+      <div className="two-column">
+        <Panel title="房間 QR Code">
+          <div className="qr-list">
+            <div className="qr-card">
+              <QrCode value={appLink(`/display/${room.roomCode}`)} />
+              <strong>公開顯示端</strong>
+            </div>
+            {slots.map((slot) => (
+              <div className="qr-card" key={slot}>
+                <QrCode value={appLink(`/judge/${room.roomCode}/${slot}`)} />
+                <strong>{slot} 裁判端</strong>
+                <span>{room.judgeScores[slot] ? '已送出' : '未送出'}</span>
+              </div>
             ))}
           </div>
-        }
-      />
-      <div className="absolute top-2 right-2 opacity-40 transition-opacity hover:opacity-100 focus-within:opacity-100">
-        {fullscreenButton}
+        </Panel>
+
+        <Panel title="流程控制">
+          <div className="action-stack">
+            <Button onClick={() => publish({ type: 'START_SCORING' })}>開始評分</Button>
+            <Button disabled={completeCount < room.judgeCount} onClick={() => publish({ type: 'LOCK_SCORES' })}>
+              鎖定成績
+            </Button>
+            <Button disabled={room.status !== 'SCORES_LOCKED'} onClick={() => publish({ type: 'PUBLISH_SCORES' })}>
+              公布成績
+            </Button>
+            <Button tone="secondary" onClick={() => publish({ type: 'RESET' })}>
+              下一位選手
+            </Button>
+          </div>
+          <div className="status-grid">
+            {slots.map((slot) => (
+              <div className="status-pill" key={slot}>
+                <span>{slot}</span>
+                <strong>{room.judgeScores[slot] ? '已送出' : '等待中'}</strong>
+                {room.judgeScores[slot] && room.status !== 'PUBLISHED' ? (
+                  <Button tone="secondary" onClick={() => publish({ type: 'RETURN_SCORE', judgeSlot: slot })}>
+                    退回
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Panel>
       </div>
-    </div>
+
+      <Panel title="主控成績">
+        <p className="muted">
+          {profile.name} · 已送出 {completeCount}/{room.judgeCount}
+        </p>
+        {room.status === 'PUBLISHED' ? <ScoreSummary result={result} /> : <p>公布前不顯示個別裁判分數與暫時計算總分。</p>}
+      </Panel>
+    </main>
   )
 }
 
-/* ================================================================== */
-/* 主控端（手機）                                                      */
-/* ================================================================== */
+export function JudgePage() {
+  const { roomCode, slot } = useParams()
+  if (!roomCode || !slot) return <Navigate to="/control" replace />
+  return <JudgeRoom roomCode={roomCode.toUpperCase()} judgeSlot={slot.toUpperCase()} />
+}
 
-export function OperatorPage(): React.ReactElement {
-  const roomCode = useRoomCode()
-  const now = useNow(100)
-  const { config, state, presences, transport, ready, dispatch, initialize, updateConfig } =
-    useRoomHost(roomCode)
-  const [correctionMode, setCorrectionMode] = useState(false)
-  const [showLinks, setShowLinks] = useState(false)
-  useWakeLock(state !== null)
+function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: string }) {
+  const { state: room, publish } = useRoom(roomCode)
+  const profile = RULE_PROFILES[room.profileId] ?? WT_RECOGNIZED_2024_06_14
+  const [deductions, setDeductions] = useState<number[]>([])
+  const [presentation, setPresentation] = useState<Record<string, number>>(() =>
+    Object.fromEntries(profile.scoring.presentationComponents.map((component) => [component.id, component.max])),
+  )
+  const locked = room.judgeScores[judgeSlot] !== undefined
+  const draft = useMemo<JudgeScoreInput>(
+    () => ({
+      judgeSlot,
+      minorMistakes: deductions.filter((value) => value === profile.deductions.minorMistake).length,
+      majorMistakes: deductions.filter((value) => value === profile.deductions.majorMistake).length,
+      presentation,
+      submittedAt: 0,
+    }),
+    [deductions, judgeSlot, presentation, profile.deductions.majorMistake, profile.deductions.minorMistake],
+  )
+  const score = computeJudgeScore(profile, draft)
 
-  /* 尚未建立比賽（例如剛掃完電視上的 QR Code）：先設定選手與時間 */
-  if (config === null || state === null) {
-    return (
-      <OperatorSetup roomCode={roomCode} transport={transport} ready={ready} onStart={initialize} />
-    )
+  function applyDeduction(value: number) {
+    if (locked) return
+    if (navigator.vibrate) navigator.vibrate(25)
+    setDeductions((items) => [...items, value])
   }
 
-  const remainingMs = computeRemainingMs(state.timer, now)
-  const rules = getRuleSet(state.config.ruleSetCode)
-  const inLastSeconds =
-    state.matchStatus === 'RUNNING' &&
-    remainingMs > 0 &&
-    remainingMs <= rules.gamjeom.lastSecondsWindowMs
-  const running = state.timer.timerStatus === 'RUNNING'
-  const judgeSeats: JudgeSeat[] = config.judgeMode === 'SINGLE' ? ['A'] : ['A', 'B']
-  const displayOnline = presences.some((p) => p.role === 'DISPLAY')
-
   return (
-    <div className="safe-area flex h-dvh w-full flex-col overflow-hidden bg-ink">
-      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-panel px-2 py-1 text-xs">
-        <Link to="/" className="font-bold text-slate-300">
-          ← 首頁
-        </Link>
-        <button
-          type="button"
-          onClick={() => setShowLinks(true)}
-          className="rounded bg-panel-2 px-2 py-1 font-bold text-slate-200"
-        >
-          房間 <b className="tabular text-white">{roomCode}</b> · 連線
-        </button>
-        <span className="ml-auto flex gap-1">
-          {judgeSeats.map((seat) => {
-            const online = presences.some((p) => p.role === 'JUDGE' && p.judgeSeat === seat)
+    <main className="judge-shell">
+      <section className="judge-header">
+        <div>
+          <p className="brand">JUDGE</p>
+          <h1>{judgeSlot} 裁判端</h1>
+          <p className="subtitle">
+            房間 {room.roomCode} · {room.athleteName} · {room.poomsaeName}
+          </p>
+        </div>
+      </section>
+      {locked ? <Notice>此裁判分數已送出並鎖定。若需修改，請由主控端退回。</Notice> : null}
+      <Panel title="正確性">
+        <div className="score-readout">
+          <span>目前分數</span>
+          <strong>{formatScore(score.accuracy)}</strong>
+        </div>
+        <div className="judge-actions">
+          <button className="deduct minor" disabled={locked} onClick={() => applyDeduction(profile.deductions.minorMistake)}>
+            小失誤 -0.1
+          </button>
+          <button className="deduct major" disabled={locked} onClick={() => applyDeduction(profile.deductions.majorMistake)}>
+            大失誤 -0.3
+          </button>
+          <button className="deduct undo" disabled={locked || deductions.length === 0} onClick={() => setDeductions((items) => items.slice(0, -1))}>
+            復原
+          </button>
+        </div>
+        <p className="muted">最近一次：{deductions.length ? `-${formatScore(deductions[deductions.length - 1] ?? 0)}` : '尚無扣分'}</p>
+      </Panel>
+      <Panel title="表現性">
+        <div className="component-list">
+          {profile.scoring.presentationComponents.map((component) => {
+            const value = presentation[component.id] ?? component.max
             return (
-              <span
-                key={seat}
-                className={`rounded px-2 py-0.5 font-bold ${
-                  online ? 'bg-emerald-600/30 text-emerald-300' : 'bg-slate-700 text-slate-400'
-                }`}
-              >
-                裁判{seat}
-              </span>
+              <div className="component-row" key={component.id}>
+                <span>{component.name}</span>
+                <div className="stepper-row">
+                  <Button
+                    tone="secondary"
+                    disabled={locked}
+                    onClick={() => setPresentation((current) => ({ ...current, [component.id]: Math.max(0, value - component.step) }))}
+                  >
+                    -
+                  </Button>
+                  <strong>{formatScore(value)}</strong>
+                  <Button
+                    tone="secondary"
+                    disabled={locked}
+                    onClick={() =>
+                      setPresentation((current) => ({
+                        ...current,
+                        [component.id]: Math.min(component.max, value + component.step),
+                      }))
+                    }
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
             )
           })}
-          <span
-            className={`rounded px-2 py-0.5 font-bold ${
-              displayOnline ? 'bg-emerald-600/30 text-emerald-300' : 'bg-slate-700 text-slate-400'
-            }`}
-          >
-            電視
-          </span>
-        </span>
-      </header>
-
-      <main className="min-h-0 flex-1">
-        <Scoreboard
-          state={state}
-          remainingMs={remainingMs}
-          flash={null}
-          compact
-          onToggleTimer={() => dispatch({ type: running ? 'PAUSE' : 'START' })}
-        />
-      </main>
-
-      <div className="min-h-0 flex-[1.2]">
-        <ControlPanel
-          state={state}
-          inLastSeconds={inLastSeconds}
-          correctionMode={correctionMode}
-          undoTarget={findLastReversibleEvent(state.events)}
-          onScore={(side, action) => {
-            dispatch({ type: 'SCORE', side, action, source: 'OPERATOR' })
-            return true
-          }}
-          onGamjeom={(side) => dispatch({ type: 'GAMJEOM', side, reason: 'OTHER', special: false })}
-          onSpecialGamjeom={(side) =>
-            dispatch({ type: 'GAMJEOM', side, reason: 'AVOIDING', special: true })
-          }
-          onToggleTimer={() => dispatch({ type: running ? 'PAUSE' : 'START' })}
-          onUndo={() => dispatch({ type: 'UNDO' })}
-          onToggleCorrection={() => setCorrectionMode((current) => !current)}
-          onEndRound={() => dispatch({ type: 'NEXT_ROUND' })}
-          onOpenMenu={() => dispatch({ type: 'SWAP_SIDES' })}
-        />
+        </div>
+        <div className="score-readout">
+          <span>表現性小計</span>
+          <strong>{formatScore(score.presentation)}</strong>
+        </div>
+      </Panel>
+      <div className="sticky-submit">
+        <Button
+          disabled={locked || room.status !== 'WAITING_FOR_SUBMISSIONS'}
+          onClick={() => publish({ type: 'SUBMIT_SCORE', score: { ...draft, submittedAt: Date.now() } })}
+        >
+          確認送出
+        </Button>
       </div>
-
-      <RoundEndPanel
-        state={state}
-        restRemainingMs={remainingMs}
-        onStartRest={() => dispatch({ type: 'START' })}
-        onSkipRest={() => dispatch({ type: 'NEXT_ROUND' })}
-        onFixResult={() => dispatch({ type: 'PREV_ROUND' })}
-        onRestart={() => dispatch({ type: 'RESTART' })}
-        onDecideSuperiority={(winner) => dispatch({ type: 'DECIDE_SUPERIORITY', winner })}
-      />
-
-      {showLinks && (
-        <ConnectionSheet
-          roomCode={roomCode}
-          transport={transport}
-          ready={ready}
-          singleJudge={config.judgeMode === 'SINGLE'}
-          onToggleJudgeMode={() =>
-            updateConfig({ judgeMode: config.judgeMode === 'SINGLE' ? 'DUAL' : 'SINGLE' })
-          }
-          onClose={() => setShowLinks(false)}
-        />
-      )}
-    </div>
+    </main>
   )
 }
 
-/** 主控端第一次進入房間時的設定畫面 */
-function OperatorSetup({
-  roomCode,
-  transport,
-  ready,
-  onStart,
-}: {
-  roomCode: string
-  transport: RoomTransport
-  ready: boolean
-  onStart: ReturnType<typeof useRoomHost>['initialize']
-}): React.ReactElement {
-  const navigate = useNavigate()
-  const [prefs] = useState(() => loadPreferences())
-  const rules = getRuleSet(prefs.lastSetup.ruleSetCode)
+export function DisplayPage() {
+  const { roomCode } = useParams()
+  if (!roomCode) return <Navigate to="/control" replace />
+  return <DisplayRoom roomCode={roomCode.toUpperCase()} />
+}
+
+function DisplayRoom({ roomCode }: { roomCode: string }) {
+  const { state: room } = useRoom(roomCode)
+  const result = scoreRoom(room)
+  const slots = judgeSlots(room.judgeCount)
 
   return (
-    <div className="min-h-dvh">
-      <div className="safe-area mx-auto flex w-full max-w-lg flex-col gap-2 px-4 pt-4 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded bg-panel-2 px-2 py-0.5 font-bold">
-            房間 <b className="tabular text-white">{roomCode}</b>
-          </span>
-          <TransportBadge transport={transport} ready={ready} />
-        </div>
-        {transport !== 'cloud' && <LocalModeWarning />}
-      </div>
-      <SetupPanel
-        initial={prefs.lastSetup}
-        onCancel={() => void navigate('/')}
-        onStart={(setup) => {
-          savePreferences({ ...prefs, lastSetup: setup })
-          const config = createRoomConfig({
-            roomCode,
-            judgeMode: 'SINGLE',
-            confirmationWindowMs: rules.trainingDefaults.confirmationWindowMs,
-          })
-          const match = createMatchState({
-            blueName: setup.blueName.trim() === '' ? '藍方' : setup.blueName.trim(),
-            redName: setup.redName.trim() === '' ? '紅方' : setup.redName.trim(),
-            totalRounds: setup.totalRounds,
-            roundDurationMs: setup.roundDurationMs,
-            restDurationMs: setup.restDurationMs,
-            ruleSetCode: setup.ruleSetCode,
-            judgeMode: 'SINGLE',
-            confirmationWindowMs: rules.trainingDefaults.confirmationWindowMs,
-            soundEnabled: prefs.soundEnabled,
-            vibrationEnabled: prefs.vibrationEnabled,
-          })
-          onStart(config, match)
-        }}
-      />
-    </div>
-  )
-}
-
-/** 主控端的連線面板：電視、裁判連結與單／雙裁判切換 */
-function ConnectionSheet({
-  roomCode,
-  transport,
-  ready,
-  singleJudge,
-  onToggleJudgeMode,
-  onClose,
-}: {
-  roomCode: string
-  transport: RoomTransport
-  ready: boolean
-  singleJudge: boolean
-  onToggleJudgeMode: () => void
-  onClose: () => void
-}): React.ReactElement {
-  return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-ink/95 p-4">
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-black">
-            房間 <span className="tabular">{roomCode}</span>
-          </h2>
-          <ActionButton tone="ghost" className="min-h-[44px] px-3 text-sm" onClick={onClose}>
-            關閉
-          </ActionButton>
-        </header>
-
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <TransportBadge transport={transport} ready={ready} />
-        </div>
-        {transport !== 'cloud' && <LocalModeWarning />}
-
-        <p className="text-sm text-slate-400">
-          電視如果還沒開，請在電視瀏覽器開啟 <b className="text-slate-200">{shortHostUrl()}</b>
-          ，點「電視顯示」後輸入房間代碼；或直接掃下面的 QR Code。
+    <main className="display-shell">
+      <section>
+        <p className="brand">TEAMPRO</p>
+        <h1>{room.athleteName}</h1>
+        <p className="display-meta">
+          {room.teamName} · {room.poomsaeName} · {room.status}
         </p>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <QrCode value={displayLink(roomCode)} label="電視顯示端" />
-          <QrCode value={judgeLink(roomCode, 'A')} label="裁判 A" />
-          {!singleJudge && <QrCode value={judgeLink(roomCode, 'B')} label="裁判 B" />}
-        </div>
-
-        <ActionButton tone="neutral" onClick={onToggleJudgeMode}>
-          {singleJudge ? '切換為雙裁判（兩人確認才得分）' : '切換為單裁判（按下即得分）'}
-        </ActionButton>
-        <p className="text-xs text-slate-500">
-          裁判端只負責送出得分；計時、Gam-jeom 與結束比賽一律在主控端。
-          雙裁判模式下，兩位裁判必須在確認時間窗內按下<b>相同選手、相同技術</b>才會加分一次
-          （確認時間窗為本系統訓練參數，非 WT 規定）。
-        </p>
-      </div>
-    </div>
-  )
-}
-
-/* ================================================================== */
-/* 加入房間（手機手動輸入房號）                                        */
-/* ================================================================== */
-
-export function JoinPage(): React.ReactElement {
-  const navigate = useNavigate()
-  const [code, setCode] = useState('')
-  const normalized = code
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 6)
-  const valid = normalized.length === 6
-
-  return (
-    <div className="safe-area mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-4 p-4">
-      <Link to="/" className="text-sm font-bold text-slate-400">
-        ← 回首頁
-      </Link>
-      <h1 className="text-2xl font-black">輸入房間代碼</h1>
-      <p className="text-sm text-slate-400">電視畫面上顯示的 6 碼代碼。</p>
-      <input
-        className="tabular min-h-[72px] rounded-lg border-2 border-line bg-panel-2 px-4 text-center text-4xl font-black tracking-[0.2em] uppercase"
-        value={normalized}
-        aria-label="房間代碼"
-        autoCapitalize="characters"
-        autoCorrect="off"
-        spellCheck={false}
-        onChange={(event) => setCode(event.target.value)}
-      />
-      <ActionButton
-        tone="primary"
-        className="min-h-[64px]"
-        disabled={!valid}
-        onClick={() => void navigate(`/operator/${normalized}`)}
-      >
-        我是主控（手機計分）
-      </ActionButton>
-      <ActionButton
-        tone="neutral"
-        disabled={!valid}
-        onClick={() => void navigate(`/display/${normalized}`)}
-      >
-        這台是電視顯示端
-      </ActionButton>
-      <ActionButton
-        tone="neutral"
-        disabled={!valid}
-        onClick={() => void navigate(`/judge/${normalized}/A`)}
-      >
-        我是裁判 A
-      </ActionButton>
-      <ActionButton
-        tone="neutral"
-        disabled={!valid}
-        onClick={() => void navigate(`/judge/${normalized}/B`)}
-      >
-        我是裁判 B
-      </ActionButton>
-    </div>
-  )
-}
-
-/* ================================================================== */
-/* 裁判端                                                              */
-/* ================================================================== */
-
-const OUTCOME_TEXT: Record<PressOutcome['status'], string> = {
-  MATCHED: '得分成立',
-  WAITING: '等待另一位裁判確認',
-  EXPIRED: '確認時間已過',
-  REJECTED: '未獲確認',
-  DUPLICATE: '已送出，未重複計分',
-}
-
-export function JudgePage(): React.ReactElement {
-  const roomCode = useRoomCode()
-  const params = useParams()
-  const seat: JudgeSeat = params.seat === 'B' ? 'B' : params.seat === 'C' ? 'C' : 'A'
-  const now = useNow(200)
-  const { snapshot, connected, transport, ready, clockOffsetMs, sendPress, outcomes } =
-    useRoomClient(roomCode, 'JUDGE', seat)
-  const [lastEventId, setLastEventId] = useState<string | null>(null)
-  const [lastPressAt, setLastPressAt] = useState(0)
-  useWakeLock(true)
-
-  const match = snapshot?.match ?? null
-  const outcome = lastEventId === null ? undefined : outcomes[lastEventId]
-  const showOutcome = lastPressAt > 0 && now - lastPressAt < 2_500
-
-  const handlePress = (side: AthleteSide, action: ActionType): boolean => {
-    const id = sendPress(side, action)
-    if (id === null) return false
-    setLastEventId(id)
-    setLastPressAt(Date.now())
-    return true
-  }
-
-  if (match === null) {
-    return (
-      <div className="safe-area flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
-        <h1 className="text-2xl font-black">裁判 {seat}</h1>
-        <p className="text-sm text-slate-400">
-          房間 <b className="tabular text-white">{roomCode}</b>：等待主控端連線中…
-        </p>
-        <TransportBadge transport={transport} ready={ready} className="text-xs" />
-        <p className="max-w-md text-xs text-slate-500">
-          主控端（教練的手機）必須保持開啟，它是這場比賽的計分來源。
-        </p>
-        {transport !== 'cloud' && (
-          <div className="max-w-md">
-            <LocalModeWarning />
+      </section>
+      <section className="display-status">
+        {slots.map((slot) => (
+          <div className="display-judge" key={slot}>
+            <span>{slot}</span>
+            <strong>{room.judgeScores[slot] ? '已送出' : '等待'}</strong>
           </div>
-        )}
-      </div>
-    )
-  }
-
-  const hostNow = now + clockOffsetMs
-  const remainingMs = computeRemainingMs(match.timer, hostNow)
-  const rules = getRuleSet(match.config.ruleSetCode)
-  const inLastSeconds =
-    match.matchStatus === 'RUNNING' &&
-    remainingMs > 0 &&
-    remainingMs <= rules.gamjeom.lastSecondsWindowMs
-
-  return (
-    <div className="safe-area flex h-dvh w-full flex-col overflow-hidden bg-ink">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel px-2 py-1 text-xs">
-        <span className="font-black">裁判 {seat}</span>
-        <span className="tabular text-slate-400">房間 {roomCode}</span>
-        <span className="text-slate-400">
-          第 {match.currentRound} 回合 · {(remainingMs / 1000).toFixed(1)} 秒
-        </span>
-        <span
-          className={`ml-auto rounded px-2 py-0.5 font-bold ${
-            connected ? 'bg-emerald-600/30 text-emerald-300' : 'bg-rose-600 text-white'
-          }`}
-        >
-          {connected ? '已連線' : '未連線，無法送分'}
-        </span>
-        {match.matchStatus !== 'RUNNING' && (
-          <span className="rounded bg-amber-600/30 px-2 py-0.5 font-bold text-amber-200">
-            {match.matchStatus === 'PAUSED' ? '比賽暫停中' : '比賽未進行'}
-          </span>
-        )}
-      </header>
-
-      {showOutcome && outcome !== undefined && (
-        <div
-          role="status"
-          className={`shrink-0 px-2 py-1 text-center text-sm font-black ${
-            outcome.status === 'MATCHED'
-              ? 'bg-emerald-600 text-white'
-              : outcome.status === 'WAITING'
-                ? 'bg-amber-600 text-black'
-                : 'bg-slate-700 text-slate-200'
-          }`}
-        >
-          {OUTCOME_TEXT[outcome.status]}
-        </div>
+        ))}
+      </section>
+      {room.status === 'PUBLISHED' ? (
+        <section className="published-score">
+          <ScoreSummary result={result} />
+        </section>
+      ) : (
+        <Notice>評分期間僅顯示裁判連線與送出狀態，公布前不顯示分數。</Notice>
       )}
+    </main>
+  )
+}
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-1 p-1">
-        <SideControls
-          side="BLUE"
-          ruleSetCode={match.config.ruleSetCode}
-          disabled={!connected}
-          onPress={handlePress}
-          onGamjeom={() => {}}
-          onSpecialGamjeom={() => {}}
-          specialGamjeomEnabled={false}
-          hideGamjeom
-        />
-        <SideControls
-          side="RED"
-          ruleSetCode={match.config.ruleSetCode}
-          disabled={!connected}
-          onPress={handlePress}
-          onGamjeom={() => {}}
-          onSpecialGamjeom={() => {}}
-          specialGamjeomEnabled={false}
-          hideGamjeom
-        />
+function ScoreSummary({ result }: { result: ReturnType<typeof scoreRoom> }) {
+  return (
+    <div className="score-summary">
+      <div>
+        <span>正確性</span>
+        <strong>{formatScore(result.accuracy)}</strong>
       </div>
-
-      <p className="shrink-0 bg-panel px-2 py-1 text-center text-[0.65rem] text-slate-500">
-        裁判端只能送出得分；計時、Gam-jeom、修改姓名與結束比賽都在主控端。
-        {inLastSeconds && ' · 進入最後 10 秒'}
-      </p>
+      <div>
+        <span>表現性</span>
+        <strong>{formatScore(result.presentation)}</strong>
+      </div>
+      <div>
+        <span>程序扣分</span>
+        <strong>{formatScore(result.procedureDeductions)}</strong>
+      </div>
+      <div className="final">
+        <span>最終總分</span>
+        <strong>{formatScore(result.total)}</strong>
+      </div>
     </div>
   )
 }
