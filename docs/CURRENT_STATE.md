@@ -14,7 +14,7 @@
 
 ## Current Experiment
 
-Experiment `E001` adds AutoResearch process documents, official rule source documents, versioned WT and USATKD recognized poomsae Rule Profiles, integer-based pure scoring engine, and fixed evaluation harness.
+Experiment `E002` replaces the placeholder public page with a directly usable single-device recognized poomsae calculator. It supports WT/USATKD profile selection, 3/5 judges, accuracy deductions, presentation components, procedure deductions, trimming markers, and final score display.
 
 ## Next Suggested Experiment
 
