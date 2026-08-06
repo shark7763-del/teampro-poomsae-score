@@ -1,5 +1,6 @@
 import { HashRouter, Route, Routes } from 'react-router'
 import { HomePage } from './pages/HomePage'
+import { ControlEntryPage, ControlPage, DisplayPage, JudgePage } from './pages/PoomsaeRoomPages'
 
 /**
  * 使用 HashRouter：
@@ -12,6 +13,10 @@ export function App(): React.ReactElement {
     <HashRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/control" element={<ControlEntryPage />} />
+        <Route path="/control/:roomCode" element={<ControlPage />} />
+        <Route path="/judge/:roomCode/:slot" element={<JudgePage />} />
+        <Route path="/display/:roomCode" element={<DisplayPage />} />
         <Route path="*" element={<HomePage />} />
       </Routes>
     </HashRouter>

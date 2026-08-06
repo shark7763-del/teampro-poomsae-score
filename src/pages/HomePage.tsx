@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { ActionButton, NonCertifiedNotice, Panel } from '../components/ui'
 import type { RuleProfile } from '../rules/profiles'
 import {
@@ -114,6 +115,13 @@ export function HomePage(): React.ReactElement {
       </header>
 
       <NonCertifiedNotice />
+
+      <Link
+        to="/control"
+        className="flex min-h-[72px] items-center justify-center rounded-lg border-2 border-emerald-400/50 bg-emerald-600/20 text-xl font-black"
+      >
+        建立現場計分房間
+      </Link>
 
       <Panel title="賽事設定">
         <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">

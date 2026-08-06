@@ -14,8 +14,8 @@
 
 ## Current Experiment
 
-Experiment `E002` replaces the placeholder public page with a directly usable single-device recognized poomsae calculator. It supports WT/USATKD profile selection, 3/5 judges, accuracy deductions, presentation components, procedure deductions, trimming markers, and final score display.
+Experiment `E003` adds LocalDemo room workflow pages: `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, and `#/display/:roomCode`. It supports same-browser multi-tab control, judge submission, score locking, publication, judge return/audit log, duplicate event protection, and stale sequence rejection.
 
 ## Next Suggested Experiment
 
-Add the poomsae room event model, then test duplicate submit, locked score rejection, and refresh/reconnect replay behavior.
+Next step: replace LocalDemoTransport with the existing Supabase Realtime transport adapter while preserving the same event envelope and privacy rules.
