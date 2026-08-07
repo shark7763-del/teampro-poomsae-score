@@ -14,16 +14,17 @@
 
 ## Current Experiment
 
-Experiment `E004` removes old sparring UI/code from this repository and leaves a focused standalone poomsae system. The current app routes are `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, `#/display/:roomCode`, and `#/training`.
+Experiment `E005` fixes a deployment-path bug in the PWA favicon/logo reference. The current app routes are `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, `#/display/:roomCode`, `#/training`, `#/training-display`, `#/training-display/:displayCode`, `#/training/session/:sessionId`, and `#/training/connect/:displayCode`.
 
-Validation on 2026-08-06:
+Validation on 2026-08-08:
 
 - `npm run typecheck`: pass
 - `npm run lint`: pass
-- `npm run test`: pass, 2 files / 7 tests
+- `npm run test`: pass, 4 files / 16 tests
 - `npm run build`: pass
 - `npm run evaluate`: 75/100
+- `npm run test:e2e`: pass, 4 tests
 
 ## Next Suggested Experiment
 
-Next step: add a real cloud Realtime Transport adapter for cross-phone use while preserving the same event envelope, judge privacy, duplicate-event protection, and sequence checks.
+Next step: add Supabase-backed integration verification for training-display snapshots and Presence once a real project URL, anon key, and migration-applied database are available.
