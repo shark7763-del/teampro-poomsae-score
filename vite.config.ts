@@ -16,7 +16,7 @@ export default defineConfig(({ command }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.png', 'icons/apple-touch-icon.png'],
+      includeAssets: ['teampro-poomsae-coach-logo.png', 'icons/poomsae-coach-apple-touch.png'],
       manifest: {
         name: 'TeamPro Poomsae Score',
         short_name: '品勢計分',
@@ -32,10 +32,10 @@ export default defineConfig(({ command }) => ({
         theme_color: '#05070c',
         categories: ['sports', 'utilities'],
         icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/poomsae-coach-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/poomsae-coach-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           {
-            src: 'icons/icon-maskable-512.png',
+            src: 'icons/poomsae-coach-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
