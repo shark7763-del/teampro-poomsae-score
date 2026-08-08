@@ -14,7 +14,7 @@
 
 ## Current Experiment
 
-Experiment `E009` adds realistic training penalty lamps, haptic button feedback, and a restart action for phone-to-TV training sessions.
+Experiment `E010` adds short TV routes and expands the E2E teammate handoff flow to verify TV sync, penalty lamps, and restart.
 
 Validation on 2026-08-08:
 
@@ -27,4 +27,4 @@ Validation on 2026-08-08:
 
 ## Next Suggested Experiment
 
-Next step: verify the production training display on a real TV and confirm the penalty lamp size/color is readable at training-room distance.
+Next step: have teammates use `#/tv` on the display device and `#/training` on the phone to verify the production handoff flow.

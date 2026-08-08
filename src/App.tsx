@@ -17,8 +17,11 @@ export function App(): React.ReactElement {
         <Route path="/training" element={<TrainingPage />} />
         <Route path="/training/session/:sessionId" element={<TrainingControllerPage />} />
         <Route path="/training/connect/:displayCode" element={<TrainingConnectPage />} />
+        <Route path="/c/:displayCode" element={<TrainingConnectPage />} />
         <Route path="/training-display" element={<TrainingDisplayPage />} />
         <Route path="/training-display/:displayCode" element={<TrainingDisplayPage />} />
+        <Route path="/tv" element={<TrainingDisplayPage />} />
+        <Route path="/tv/:displayCode" element={<TrainingDisplayPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

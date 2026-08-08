@@ -54,7 +54,7 @@ function TrainingDisplayWaiting({
   state: TrainingDisplayState
   transportKind: 'local' | 'supabase'
 }): React.ReactElement {
-  const connectUrl = appLink(`/training/connect/${state.displayCode}?sessionId=${state.sessionId}`)
+  const connectUrl = appLink(`/c/${state.displayCode}?sessionId=${state.sessionId}`)
   return (
     <main className="training-tv-shell">
       <section className="training-tv-wait">
@@ -66,7 +66,7 @@ function TrainingDisplayWaiting({
         <div className="tv-code">{state.displayCode}</div>
         <QrCode value={connectUrl} label="手機掃描連接" size={260} />
         {transportKind === 'local' ? <Notice>本機測試模式：只能同一台裝置的瀏覽器分頁同步。跨手機與電視請設定 Supabase。</Notice> : null}
-        <Link className="ghost-link" to={`/training-display/${state.displayCode}`}>
+        <Link className="ghost-link" to={`/tv/${state.displayCode}`}>
           進入顯示畫面
         </Link>
       </section>

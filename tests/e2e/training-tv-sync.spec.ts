@@ -4,10 +4,10 @@ test('coach phone connects to training display and controls public data', async 
   const context = await browser.newContext()
   const tv = await context.newPage()
   await tv.setViewportSize({ width: 1366, height: 768 })
-  await tv.goto('/#/training-display')
+  await tv.goto('/#/tv')
   await expect(tv.getByText('等待教練手機連接')).toBeVisible()
   const displayCode = (await tv.locator('.tv-code').innerText()).trim()
-  await tv.goto(`/#/training-display/${displayCode}`)
+  await tv.goto(`/#/tv/${displayCode}`)
 
   const phone = await context.newPage()
   await phone.setViewportSize({ width: 390, height: 844 })
@@ -25,6 +25,11 @@ test('coach phone connects to training display and controls public data', async 
   await phone.getByRole('button', { name: '即時評分' }).click()
   await expect(tv.getByText('正確性')).toBeVisible()
   await expect(tv.getByText('小失誤')).toBeVisible()
+  await expect(tv.getByText('-0.1')).toBeVisible()
+  await phone.getByRole('button', { name: '大失誤 -0.3' }).click()
+  await expect(tv.getByText('-0.3')).toBeVisible()
+  await phone.getByRole('button', { name: '重新開始' }).first().click()
+  await expect(tv.getByText('待開始')).toBeVisible()
 
   await phone.getByRole('button', { name: '公布結果' }).click()
   await expect(tv.getByText('修正重點')).toBeVisible()
@@ -33,6 +38,6 @@ test('coach phone connects to training display and controls public data', async 
 })
 
 test('private coach notes are not rendered on display route', async ({ page }) => {
-  await page.goto('/#/training-display')
+  await page.goto('/#/tv')
   await expect(page.locator('body')).not.toContainText('私人筆記')
 })
