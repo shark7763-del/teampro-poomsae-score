@@ -1,5 +1,7 @@
 import type { RuleProfile } from '../rules/profiles'
 
+export type JudgeCount = 1 | 3 | 5
+
 export interface JudgeScoreInput {
   judgeSlot: string
   minorMistakes: number
@@ -62,7 +64,7 @@ export function computePerformanceScore({
   procedureDeductions,
 }: {
   profile: RuleProfile
-  judgeCount: 3 | 5
+  judgeCount: JudgeCount
   judgeScores: JudgeScoreInput[]
   procedureDeductions: number
 }): PerformanceScoreResult {
@@ -122,8 +124,8 @@ function average(values: number[]): number {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
 }
 
-function exclusionIndexes(values: number[], profile: RuleProfile, judgeCount: 3 | 5): Set<number> {
-  if (!profile.trimming.enabledJudgeCounts.includes(judgeCount)) return new Set()
+function exclusionIndexes(values: number[], profile: RuleProfile, judgeCount: JudgeCount): Set<number> {
+  if (!profile.trimming.enabledJudgeCounts.some((count) => count === judgeCount)) return new Set()
   const excluded = new Set<number>()
   const high = firstExtremeIndex(values, excluded, 'high')
   if (high !== null) excluded.add(high)

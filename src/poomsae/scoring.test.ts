@@ -34,6 +34,22 @@ describe('poomsae scoring engine', () => {
     expect(result.total).toBe(99)
   })
 
+  it('supports one-judge training scoring without trimming', () => {
+    const result = computePerformanceScore({
+      profile: WT_RECOGNIZED_2024_06_14,
+      judgeCount: 1,
+      judgeScores: [judge('J1', 2, 1, { speed_power: 18, rhythm_tempo: 19, energy_expression: 20 })],
+      procedureDeductions: 3,
+    })
+
+    expect(result.accuracy).toBe(35)
+    expect(result.presentation).toBe(57)
+    expect(result.total).toBe(89)
+    expect(result.judges).toHaveLength(1)
+    expect(result.judges.at(0)?.excludedAccuracy).toBe(false)
+    expect(result.judges.at(0)?.excludedPresentation).toBe(false)
+  })
+
   it('trims accuracy and presentation independently for five judges', () => {
     const result = computePerformanceScore({
       profile: USATKD_RECOGNIZED_2026_01_01,

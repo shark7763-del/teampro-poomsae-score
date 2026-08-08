@@ -14,17 +14,17 @@
 
 ## Current Experiment
 
-Experiment `E005` fixes a deployment-path bug in the PWA favicon/logo reference. The current app routes are `#/control`, `#/control/:roomCode`, `#/judge/:roomCode/:slot`, `#/display/:roomCode`, `#/training`, `#/training-display`, `#/training-display/:displayCode`, `#/training/session/:sessionId`, and `#/training/connect/:displayCode`.
+Experiment `E006` makes `#/training` directly usable without Supabase by defaulting to single-device scoring with 1, 3, or 5 judge modes while preserving the training TV connection flow.
 
 Validation on 2026-08-08:
 
 - `npm run typecheck`: pass
 - `npm run lint`: pass
-- `npm run test`: pass, 4 files / 16 tests
+- `npm run test`: pass, 4 files / 17 tests
 - `npm run build`: pass
 - `npm run evaluate`: 75/100
 - `npm run test:e2e`: pass, 4 tests
 
 ## Next Suggested Experiment
 
-Next step: add Supabase-backed integration verification for training-display snapshots and Presence once a real project URL, anon key, and migration-applied database are available.
+Next step: deploy E006, then configure Supabase env vars and database migration for real cross-device TV sync.

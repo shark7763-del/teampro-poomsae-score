@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AppLogo } from '../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../components/ui'
@@ -11,13 +11,20 @@ function formatTime(totalSeconds: number): string {
   return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`
 }
 
-export function TrainingControllerPage(): React.ReactElement {
+export function TrainingControllerPage({
+  initialDisplayCode = '',
+  autoConnect = false,
+}: {
+  initialDisplayCode?: string
+  autoConnect?: boolean
+}): React.ReactElement {
   const { sessionId } = useParams()
   const controller = useTrainingController(sessionId)
   const state = controller.session.state
   const recentDisplay = controller.recentDisplay
-  const [displayCode, setDisplayCode] = useState(controller.recentDisplay?.displayCode ?? '')
+  const [displayCode, setDisplayCode] = useState(initialDisplayCode || controller.recentDisplay?.displayCode || '')
   const [error, setError] = useState('')
+  const autoConnectStarted = useRef(false)
 
   async function connect(): Promise<void> {
     try {
@@ -27,6 +34,12 @@ export function TrainingControllerPage(): React.ReactElement {
       setError(caught instanceof Error ? caught.message : '連接失敗')
     }
   }
+
+  useEffect(() => {
+    if (!autoConnect || autoConnectStarted.current || !displayCode) return
+    autoConnectStarted.current = true
+    void connect()
+  })
 
   async function setMode(mode: DisplayMode): Promise<void> {
     await controller.setDisplayMode(mode)

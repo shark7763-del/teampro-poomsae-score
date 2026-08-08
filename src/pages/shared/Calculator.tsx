@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AppLogo } from '../../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../../components/ui'
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../../rules/profiles'
-import type { JudgeScoreInput } from '../../poomsae/scoring'
+import type { JudgeCount, JudgeScoreInput } from '../../poomsae/scoring'
 import { computeJudgeScore, computePerformanceScore, formatScore } from '../../poomsae/scoring'
 
 const MAX_JUDGES = 5
@@ -19,7 +19,7 @@ function createJudge(slot: string): JudgeScoreInput {
 
 export function Calculator(): React.ReactElement {
   const [profileId, setProfileId] = useState(WT_RECOGNIZED_2024_06_14.id)
-  const [judgeCount, setJudgeCount] = useState<3 | 5>(3)
+  const [judgeCount, setJudgeCount] = useState<JudgeCount>(1)
   const [athleteName, setAthleteName] = useState('選手 A')
   const [teamName, setTeamName] = useState('TeamPro')
   const [poomsaeName, setPoomsaeName] = useState('太極八章')
@@ -61,7 +61,10 @@ export function Calculator(): React.ReactElement {
           <TextField label="選手姓名" value={athleteName} onChange={setAthleteName} />
           <TextField label="單位" value={teamName} onChange={setTeamName} />
           <TextField label="指定品勢" value={poomsaeName} onChange={setPoomsaeName} />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Button onClick={() => setJudgeCount(1)} tone={judgeCount === 1 ? 'primary' : 'neutral'}>
+              1 位裁判
+            </Button>
             <Button onClick={() => setJudgeCount(3)} tone={judgeCount === 3 ? 'primary' : 'neutral'}>
               3 位裁判
             </Button>
