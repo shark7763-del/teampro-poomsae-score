@@ -299,5 +299,20 @@ export function useTrainingDisplay(displayCode?: string) {
     }
   }, [displayCode, transport])
 
+  useEffect(() => {
+    if (session?.transportKind !== 'supabase') return
+    const interval = window.setInterval(() => {
+      void transport.readSnapshot().then((snapshot) => {
+        if (snapshot === null) return
+        setState((current) => {
+          if (current !== null && snapshot.sequence < current.sequence) return current
+          void saveTrainingSnapshot(snapshot)
+          return snapshot
+        })
+      })
+    }, 1500)
+    return () => window.clearInterval(interval)
+  }, [session?.transportKind, transport])
+
   return { state, session, connectionStatus, transportKind: session?.transportKind ?? 'local' }
 }

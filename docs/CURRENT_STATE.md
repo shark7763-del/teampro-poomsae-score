@@ -14,7 +14,7 @@
 
 ## Current Experiment
 
-Experiment `E006` makes `#/training` directly usable without Supabase by defaulting to single-device scoring with 1, 3, or 5 judge modes while preserving the training TV connection flow.
+Experiment `E007` adds a Supabase snapshot polling fallback for training display updates so the TV can recover public state even when Realtime Broadcast delivery is delayed or blocked.
 
 Validation on 2026-08-08:
 
@@ -27,4 +27,4 @@ Validation on 2026-08-08:
 
 ## Next Suggested Experiment
 
-Next step: deploy E006, then configure Supabase env vars and database migration for real cross-device TV sync.
+Next step: verify phone-to-TV sync on two physical devices using the production URL and keep the Supabase SQL migration applied in the project.

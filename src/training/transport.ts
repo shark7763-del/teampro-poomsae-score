@@ -87,10 +87,15 @@ export class LocalTrainingTransport implements TrainingRealtimeTransport {
     })
   }
 
+  async readSnapshot(): Promise<TrainingDisplayState | null> {
+    if (this.session === null) return null
+    const raw = localStorage.getItem(snapshotKey(this.session.sessionId))
+    return parseTrainingDisplayState(raw === null ? null : JSON.parse(raw))
+  }
+
   async requestSnapshot(): Promise<void> {
     if (this.session === null) return
-    const raw = localStorage.getItem(snapshotKey(this.session.sessionId))
-    const snapshot = parseTrainingDisplayState(raw === null ? null : JSON.parse(raw))
+    const snapshot = await this.readSnapshot()
     if (snapshot !== null) await this.publishSnapshot(snapshot)
   }
 
@@ -185,6 +190,18 @@ export class SupabaseTrainingTransport implements TrainingRealtimeTransport {
       type: 'STATE_SNAPSHOT',
       payload: { snapshot: sanitized },
     })
+  }
+
+  async readSnapshot(): Promise<TrainingDisplayState | null> {
+    if (this.session === null) return null
+    const { data, error } = await this.client
+      .from(SNAPSHOT_TABLE)
+      .select('snapshot')
+      .eq('session_id', this.session.sessionId)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle<{ snapshot: TrainingDisplayState }>()
+    if (error !== null || data === null) return null
+    return parseTrainingDisplayState(data.snapshot)
   }
 
   async requestSnapshot(): Promise<void> {

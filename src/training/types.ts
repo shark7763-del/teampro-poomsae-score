@@ -112,6 +112,7 @@ export interface TrainingRealtimeTransport {
   joinDisplay(displayCode: string): Promise<TrainingDisplaySession>
   publish(event: TrainingDisplayEvent): Promise<void>
   publishSnapshot(snapshot: TrainingDisplayState): Promise<void>
+  readSnapshot(): Promise<TrainingDisplayState | null>
   requestSnapshot(): Promise<void>
   subscribe(handler: (event: TrainingDisplayEvent) => void): () => void
   trackPresence(payload: TrainingPresence): Promise<void>
