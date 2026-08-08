@@ -24,10 +24,10 @@ test('coach phone connects to training display and controls public data', async 
 
   await phone.getByRole('button', { name: '即時評分' }).click()
   await expect(tv.getByText('正確性')).toBeVisible()
-  await expect(tv.getByText('小失誤')).toBeVisible()
-  await expect(tv.getByText('-0.1')).toBeVisible()
+  await expect(tv.getByText('小失誤 -0.1')).toBeVisible()
+  await expect(tv.locator('.penalty-lamp').getByText('-0.1')).toBeVisible()
   await phone.getByRole('button', { name: '大失誤 -0.3' }).click()
-  await expect(tv.getByText('-0.3')).toBeVisible()
+  await expect(tv.locator('.penalty-lamp').getByText('-0.3')).toBeVisible()
   await phone.getByRole('button', { name: '重新開始' }).first().click()
   await expect(tv.getByText('待開始')).toBeVisible()
 

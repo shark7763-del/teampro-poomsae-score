@@ -14,7 +14,7 @@
 
 ## Current Experiment
 
-Experiment `E010` adds short TV routes and expands the E2E teammate handoff flow to verify TV sync, penalty lamps, and restart.
+Experiment `E011` fixes the training penalty lamp payload so live-score TV screens show the large -0.1/-0.3 signal instead of only the mistake counters.
 
 Validation on 2026-08-08:
 
@@ -27,4 +27,4 @@ Validation on 2026-08-08:
 
 ## Next Suggested Experiment
 
-Next step: have teammates use `#/tv` on the display device and `#/training` on the phone to verify the production handoff flow.
+Next step: have teammates use `#/tv` on the display device and `#/training` on the phone, switch to live-score mode, and confirm the large penalty lamp appears.

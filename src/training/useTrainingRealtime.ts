@@ -168,6 +168,7 @@ export function useTrainingController(initialSessionId?: string) {
             payload: {
               minorMistakes: nextState.minorMistakes,
               majorMistakes: nextState.majorMistakes,
+              lastPenalty: nextState.lastPenalty,
               latestPublicHint: nextState.latestPublicHint,
             },
           }),
