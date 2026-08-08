@@ -90,8 +90,8 @@ export function useTrainingController(initialSessionId?: string) {
       const nextState = applyTrainingDisplayEvent(sessionRef.current.state, event)
       const next = { ...sessionRef.current, state: nextState }
       applyAndPersist(next)
-      await transport.publish(event)
       await transport.publishSnapshot(sanitizeTrainingDisplayState(nextState))
+      void transport.publish(event).catch(() => undefined)
     },
     [applyAndPersist, transport],
   )

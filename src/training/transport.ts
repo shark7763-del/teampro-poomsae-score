@@ -178,7 +178,7 @@ export class SupabaseTrainingTransport implements TrainingRealtimeTransport {
   async publishSnapshot(snapshot: TrainingDisplayState): Promise<void> {
     const sanitized = sanitizeTrainingDisplayState(snapshot)
     await this.upsertSnapshot(sanitized)
-    await this.publish({
+    void this.publish({
       schemaVersion: 1,
       eventId: createId('evt'),
       sessionId: sanitized.sessionId,
@@ -189,7 +189,7 @@ export class SupabaseTrainingTransport implements TrainingRealtimeTransport {
       sentAt: Date.now(),
       type: 'STATE_SNAPSHOT',
       payload: { snapshot: sanitized },
-    })
+    }).catch(() => undefined)
   }
 
   async readSnapshot(): Promise<TrainingDisplayState | null> {
@@ -261,7 +261,11 @@ export class SupabaseTrainingTransport implements TrainingRealtimeTransport {
     if (this.channel === null && this.session !== null) this.openChannel(this.session.sessionId)
     if (this.channel === null) return
     await new Promise<void>((resolve) => {
-      this.channel?.subscribe(() => resolve())
+      const timeout = window.setTimeout(resolve, 3000)
+      this.channel?.subscribe(() => {
+        window.clearTimeout(timeout)
+        resolve()
+      })
     })
   }
 

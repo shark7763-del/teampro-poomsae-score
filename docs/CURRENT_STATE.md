@@ -14,7 +14,7 @@
 
 ## Current Experiment
 
-Experiment `E007` adds a Supabase snapshot polling fallback for training display updates so the TV can recover public state even when Realtime Broadcast delivery is delayed or blocked.
+Experiment `E008` makes Supabase training updates snapshot-first so display state is persisted before any Realtime Broadcast attempt.
 
 Validation on 2026-08-08:
 
@@ -27,4 +27,4 @@ Validation on 2026-08-08:
 
 ## Next Suggested Experiment
 
-Next step: verify phone-to-TV sync on two physical devices using the production URL and keep the Supabase SQL migration applied in the project.
+Next step: verify phone-to-TV sync on two physical devices using the production URL; Broadcast remains an acceleration path and snapshot polling is the reliability fallback.
