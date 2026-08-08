@@ -24,6 +24,7 @@ export function TrainingControllerPage({
   const recentDisplay = controller.recentDisplay
   const [displayCode, setDisplayCode] = useState(initialDisplayCode || controller.recentDisplay?.displayCode || '')
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState<'minor' | 'major' | 'reset' | ''>('')
   const autoConnectStarted = useRef(false)
 
   async function connect(): Promise<void> {
@@ -43,6 +44,35 @@ export function TrainingControllerPage({
 
   async function setMode(mode: DisplayMode): Promise<void> {
     await controller.setDisplayMode(mode)
+  }
+
+  function pulse(kind: 'minor' | 'major' | 'reset'): void {
+    setFeedback(kind)
+    window.setTimeout(() => setFeedback(''), 180)
+    if ('vibrate' in navigator) navigator.vibrate(kind === 'major' ? 70 : 40)
+  }
+
+  async function addMinorMistake(): Promise<void> {
+    pulse('minor')
+    await controller.updateTraining({
+      minorMistakes: state.minorMistakes + 1,
+      lastPenalty: { kind: 'minor', value: 1, label: '-0.1', at: Date.now() },
+      latestPublicHint: '小失誤：確認步伐與手部位置',
+    })
+  }
+
+  async function addMajorMistake(): Promise<void> {
+    pulse('major')
+    await controller.updateTraining({
+      majorMistakes: state.majorMistakes + 1,
+      lastPenalty: { kind: 'major', value: 3, label: '-0.3', at: Date.now() },
+      latestPublicHint: '大失誤：重新確認動作路線',
+    })
+  }
+
+  async function restart(): Promise<void> {
+    pulse('reset')
+    await controller.resetTraining()
   }
 
   return (
@@ -91,14 +121,17 @@ export function TrainingControllerPage({
           <strong>{formatTime(elapsedSeconds(state))}</strong>
         </div>
         <div className="judge-actions">
-          <button className="deduct minor" onClick={() => void controller.updateTraining({ minorMistakes: state.minorMistakes + 1, latestPublicHint: '小失誤：確認步伐與手部位置' })}>
+          <button className={`deduct minor ${feedback === 'minor' ? 'pressed' : ''}`} onClick={() => void addMinorMistake()}>
             小失誤 -0.1
           </button>
-          <button className="deduct major" onClick={() => void controller.updateTraining({ majorMistakes: state.majorMistakes + 1, latestPublicHint: '大失誤：重新確認動作路線' })}>
+          <button className={`deduct major ${feedback === 'major' ? 'pressed' : ''}`} onClick={() => void addMajorMistake()}>
             大失誤 -0.3
           </button>
           <button className="deduct undo" onClick={() => void controller.updateTraining({ minorMistakes: Math.max(0, state.minorMistakes - 1) })}>
             復原小失誤
+          </button>
+          <button className={`deduct reset ${feedback === 'reset' ? 'pressed' : ''}`} onClick={() => void restart()}>
+            重新開始
           </button>
         </div>
         <div className="button-row">
@@ -150,6 +183,7 @@ export function TrainingControllerPage({
           <label className="toggle-line"><input type="checkbox" checked={state.options.autoPublishResult} onChange={(event) => void controller.setOption('autoPublishResult', event.target.checked)} /> 完成後自動公布結果</label>
           <div className="button-row">
             <Button onClick={() => void controller.publishResult()}>公布結果</Button>
+            <Button tone="secondary" onClick={() => void restart()}>重新開始</Button>
             <Button tone="secondary" onClick={() => void controller.resync()}>強制重新同步</Button>
             <Button tone="secondary" onClick={() => void controller.setOption('hidden', !state.options.hidden)}>
               {state.options.hidden ? '顯示電視畫面' : '隱藏電視畫面'}

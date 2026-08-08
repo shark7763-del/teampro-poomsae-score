@@ -14,17 +14,17 @@
 
 ## Current Experiment
 
-Experiment `E008` makes Supabase training updates snapshot-first so display state is persisted before any Realtime Broadcast attempt.
+Experiment `E009` adds realistic training penalty lamps, haptic button feedback, and a restart action for phone-to-TV training sessions.
 
 Validation on 2026-08-08:
 
 - `npm run typecheck`: pass
 - `npm run lint`: pass
-- `npm run test`: pass, 4 files / 17 tests
+- `npm run test`: pass, 4 files / 18 tests
 - `npm run build`: pass
 - `npm run evaluate`: 75/100
 - `npm run test:e2e`: pass, 4 tests
 
 ## Next Suggested Experiment
 
-Next step: verify phone-to-TV sync on two physical devices using the production URL; Broadcast remains an acceleration path and snapshot polling is the reliability fallback.
+Next step: verify the production training display on a real TV and confirm the penalty lamp size/color is readable at training-room distance.

@@ -107,4 +107,20 @@ describe('training display state protocol', () => {
     expect(buildResult(state).total).toBe(92)
     expect(buildResult(state).topIssues).toEqual(['重心', '節奏', '視線'])
   })
+
+  it('applies latest penalty signal to public accuracy updates', () => {
+    const state = createTrainingDisplayState()
+    const next = applyTrainingDisplayEvent(
+      state,
+      event(state, 1, 'ACCURACY_UPDATED', {
+        minorMistakes: 1,
+        majorMistakes: 0,
+        latestPublicHint: '小失誤',
+        lastPenalty: { kind: 'minor', value: 1, label: '-0.1', at: 2000 },
+      }),
+    )
+
+    expect(next.lastPenalty?.label).toBe('-0.1')
+    expect(next.minorMistakes).toBe(1)
+  })
 })

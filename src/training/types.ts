@@ -2,6 +2,14 @@ export type DisplayMode = 'athlete' | 'live-score' | 'result'
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'ended'
 export type SenderRole = 'controller' | 'display'
 export type TrainingConnectionStatus = 'not_connected' | 'connecting' | 'connected' | 'reconnecting' | 'offline'
+export type TrainingPenaltyKind = 'minor' | 'major'
+
+export interface TrainingPenaltySignal {
+  kind: TrainingPenaltyKind
+  value: 1 | 3
+  label: '-0.1' | '-0.3'
+  at: number
+}
 
 export interface TrainingDisplayOptions {
   showTimer: boolean
@@ -44,6 +52,7 @@ export interface TrainingDisplayState {
   accumulatedSeconds: number
   minorMistakes: number
   majorMistakes: number
+  lastPenalty: TrainingPenaltySignal | null
   latestPublicHint: string
   issueTags: string[]
   presentation: {
@@ -98,7 +107,15 @@ export type TrainingDisplayEvent =
   | (TrainingEventBase & { type: 'TIMER_STARTED'; payload: { timerStartedAt: number; accumulatedSeconds: number } })
   | (TrainingEventBase & { type: 'TIMER_PAUSED'; payload: { accumulatedSeconds: number } })
   | (TrainingEventBase & { type: 'TIMER_SYNC'; payload: { timerStartedAt: number | null; accumulatedSeconds: number; timerStatus: TimerStatus } })
-  | (TrainingEventBase & { type: 'ACCURACY_UPDATED'; payload: { minorMistakes: number; majorMistakes: number; latestPublicHint: string } })
+  | (TrainingEventBase & {
+      type: 'ACCURACY_UPDATED'
+      payload: {
+        minorMistakes: number
+        majorMistakes: number
+        latestPublicHint: string
+        lastPenalty?: TrainingPenaltySignal | null
+      }
+    })
   | (TrainingEventBase & { type: 'PRESENTATION_UPDATED'; payload: TrainingDisplayState['presentation'] })
   | (TrainingEventBase & { type: 'DISPLAY_MODE_CHANGED'; payload: { displayMode: DisplayMode; options: TrainingDisplayOptions } })
   | (TrainingEventBase & { type: 'RESULT_PUBLISHED'; payload: { result: TrainingResultSummary } })

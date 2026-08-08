@@ -30,6 +30,7 @@ type TrainingPatch = Partial<
     | 'phase'
     | 'minorMistakes'
     | 'majorMistakes'
+    | 'lastPenalty'
     | 'latestPublicHint'
     | 'issueTags'
     | 'presentation'
@@ -209,6 +210,32 @@ export function useTrainingController(initialSessionId?: string) {
     await publishEvent(makeEvent({ type: 'RESULT_PUBLISHED', payload: { result: buildResult(sessionRef.current.state) } }))
   }, [makeEvent, publishEvent])
 
+  const resetTraining = useCallback(async (): Promise<void> => {
+    const current = sessionRef.current.state
+    const nextState = {
+      ...current,
+      sequence: current.sequence + 1,
+      updatedAt: Date.now(),
+      phase: '準備',
+      timerStatus: 'idle' as const,
+      timerStartedAt: null,
+      accumulatedSeconds: 0,
+      minorMistakes: 0,
+      majorMistakes: 0,
+      lastPenalty: null,
+      latestPublicHint: '',
+      issueTags: [],
+      presentation: { speedPower: 20, rhythmTempo: 20, energyExpression: 20 },
+      result: null,
+      displayMode: current.displayMode === 'result' ? 'athlete' as const : current.displayMode,
+    }
+    const next = { ...sessionRef.current, state: nextState }
+    sessionRef.current = next
+    sequenceRef.current = nextState.sequence
+    applyAndPersist(next)
+    await transport.publishSnapshot(sanitizeTrainingDisplayState(nextState))
+  }, [applyAndPersist, transport])
+
   const resync = useCallback(async (): Promise<void> => {
     await transport.publishSnapshot(sanitizeTrainingDisplayState(sessionRef.current.state))
   }, [transport])
@@ -233,6 +260,7 @@ export function useTrainingController(initialSessionId?: string) {
     startTimer,
     pauseTimer,
     publishResult,
+    resetTraining,
     resync,
     disconnect,
   }

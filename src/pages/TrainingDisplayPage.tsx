@@ -125,12 +125,15 @@ function TrainingDisplayScreen({
         <div className="tv-timer">{state.options.showTimer ? formatTime(elapsed) : timerStatusText(state.timerStatus)}</div>
         <div className="tv-goal">{state.publicGoal}</div>
         {state.displayMode === 'live-score' ? (
-          <div className="tv-result-grid">
-            {state.options.showAccuracy ? <Metric label="正確性" value={((40 - state.minorMistakes - state.majorMistakes * 3) / 10).toFixed(1)} /> : null}
-            {state.options.showMistakeCounts ? <Metric label="小失誤" value={String(state.minorMistakes)} /> : null}
-            {state.options.showMistakeCounts ? <Metric label="大失誤" value={String(state.majorMistakes)} /> : null}
-            <Metric label="狀態" value={timerStatusText(state.timerStatus)} />
-          </div>
+          <>
+            {state.lastPenalty ? <PenaltyLamp kind={state.lastPenalty.kind} label={state.lastPenalty.label} /> : null}
+            <div className="tv-result-grid">
+              {state.options.showAccuracy ? <Metric label="正確性" value={((40 - state.minorMistakes - state.majorMistakes * 3) / 10).toFixed(1)} /> : null}
+              {state.options.showMistakeCounts ? <Metric label="小失誤 -0.1" value={String(state.minorMistakes)} /> : null}
+              {state.options.showMistakeCounts ? <Metric label="大失誤 -0.3" value={String(state.majorMistakes)} /> : null}
+              <Metric label="狀態" value={timerStatusText(state.timerStatus)} />
+            </div>
+          </>
         ) : null}
         {state.options.showIssueTags && state.latestPublicHint ? <p className="tv-hint">{state.latestPublicHint}</p> : null}
         <p className="display-meta">
@@ -138,6 +141,15 @@ function TrainingDisplayScreen({
         </p>
       </section>
     </main>
+  )
+}
+
+function PenaltyLamp({ kind, label }: { kind: 'minor' | 'major'; label: string }): React.ReactElement {
+  return (
+    <div className={`penalty-lamp ${kind}`}>
+      <span>{kind === 'minor' ? '小失誤' : '大失誤'}</span>
+      <strong>{label}</strong>
+    </div>
   )
 }
 

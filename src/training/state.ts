@@ -56,6 +56,7 @@ export function createTrainingDisplayState(input: {
     accumulatedSeconds: 0,
     minorMistakes: 0,
     majorMistakes: 0,
+    lastPenalty: null,
     latestPublicHint: '',
     issueTags: [],
     presentation: { speedPower: 20, rhythmTempo: 20, energyExpression: 20 },
