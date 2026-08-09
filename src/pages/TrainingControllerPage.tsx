@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AppLogo } from '../components/AppLogo'
+import { TvUrlHint } from '../components/TvUrlHint'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import { formatScore } from '../poomsae/scoring'
 import { elapsedSeconds } from '../training/state'
@@ -92,6 +93,7 @@ export function TrainingControllerPage({
       />
       {error ? <Notice>{error}</Notice> : null}
       <Panel title="連接電視">
+        <TvUrlHint />
         <div className="setup-grid">
           <TextField label="六碼代碼" value={displayCode} onChange={(value) => setDisplayCode(value.toUpperCase())} />
           <div className="button-row align-end">
