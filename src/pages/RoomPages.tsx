@@ -1,17 +1,71 @@
-import { useMemo, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router'
+import { useState } from 'react'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import { AppLogo } from '../components/AppLogo'
 import { QrCode } from '../components/QrCode'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import type { JudgeScoreInput } from '../poomsae/scoring'
 import { computeJudgeScore, formatPoints } from '../poomsae/scoring'
-import { generateRoomCode, judgeSlots, scoreRoom } from '../poomsae/room'
+import {
+  generateRoomCode,
+  judgeSlots,
+  nextAthlete,
+  roundKey,
+  scoreRoom,
+  submissionIdFor,
+  type RoomState,
+} from '../poomsae/room'
 import { useRoom } from '../poomsae/useRoom'
+import type { RoomConnectionStatus } from '../poomsae/transport'
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../rules/profiles'
 import { createProcedureDeduction, totalProcedureDeduction } from '../rules/penalties'
 
 function appLink(path: string): string {
   return `${window.location.origin}${window.location.pathname}#${path}`
+}
+
+const STATUS_LABEL: Record<RoomConnectionStatus, string> = {
+  connecting: '🟡 連線中',
+  connected: '🟢 已連線',
+  reconnecting: '🟡 重新連線中',
+  offline: '🔴 離線',
+  local: '🟠 本機模式',
+}
+
+/**
+ * 連線狀態列。
+ * 本機模式要講白話 —— 假裝已同步是這套系統最不能犯的錯。
+ */
+function ConnectionBar({
+  status,
+  transportKind,
+  error,
+}: {
+  status: RoomConnectionStatus
+  transportKind: 'local' | 'supabase'
+  error: string
+}) {
+  return (
+    <>
+      <p className="muted">連線狀態：{STATUS_LABEL[status]}</p>
+      {transportKind === 'local' ? (
+        <Notice>
+          本機模式：只有這台裝置的瀏覽器分頁會同步，其他手機掃 QR Code 看不到任何東西。
+          需設定 Supabase 憑證才會跨裝置。
+        </Notice>
+      ) : null}
+      {error ? <Notice>{error}</Notice> : null}
+    </>
+  )
+}
+
+function LoadingRoom({ roomCode }: { roomCode: string }) {
+  return (
+    <main className="page-shell">
+      <AppLogo />
+      <h1>房間 {roomCode}</h1>
+      <p className="subtitle">連線中…</p>
+    </main>
+  )
 }
 
 export function ControlEntryPage() {
@@ -23,7 +77,7 @@ export function ControlEntryPage() {
         <div>
           <AppLogo />
           <h1>跆拳道品勢計分系統</h1>
-          <p className="subtitle">獨立品勢系統。控制端建立房間後，裁判以 QR Code 加入。</p>
+          <p className="subtitle">建立房間後，裁判掃各自的 QR Code 加入，電視開顯示端。</p>
         </div>
         <Link className="ghost-link" to="/training">
           單機訓練模式
@@ -44,21 +98,10 @@ export function ControlEntryPage() {
             </Link>
           </div>
         </div>
-      </Panel>
-
-      <Panel title="加入 QR Code">
-        <div className="qr-list">
-          <div className="qr-card">
-            <QrCode value={appLink(`/display/${roomCode}`)} />
-            <strong>公開顯示端</strong>
-          </div>
-          {['J1', 'J2', 'J3', 'J4', 'J5'].map((slot) => (
-            <div className="qr-card" key={slot}>
-              <QrCode value={appLink(`/judge/${roomCode}/${slot}`)} />
-              <strong>{slot} 裁判端</strong>
-            </div>
-          ))}
-        </div>
+        <p className="muted">
+          裁判與顯示端的 QR Code 會在主控端建立房間後產生 —— 每個 QR 都帶各自的授權碼，
+          所以必須從主控端發出，不能在這裡預先產生。
+        </p>
       </Panel>
     </main>
   )
@@ -71,11 +114,15 @@ export function ControlPage() {
 }
 
 function ControlRoom({ roomCode }: { roomCode: string }) {
-  const { state: room, publish } = useRoom(roomCode)
+  const { state: room, status, transportKind, error, publish } = useRoom(roomCode, { role: 'HOST' })
+  if (room === null) return <LoadingRoom roomCode={roomCode} />
+
   const result = scoreRoom(room)
   const profile = RULE_PROFILES[room.profileId] ?? WT_RECOGNIZED_2024_06_14
   const slots = judgeSlots(room.judgeCount)
   const completeCount = slots.filter((slot) => room.judgeScores[slot]).length
+  const upcoming = nextAthlete(room)
+  const tokens = room.tokens
 
   return (
     <main className="page-shell">
@@ -86,7 +133,7 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
           <p className="subtitle">{room.status}</p>
         </div>
         <div className="button-row">
-          <Link className="ghost-link" to={`/display/${room.roomCode}`}>
+          <Link className="ghost-link" to={`/display/${room.roomCode}?token=${tokens?.displayToken ?? ''}`}>
             顯示端
           </Link>
           <Link className="ghost-link" to="/training">
@@ -94,6 +141,8 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
           </Link>
         </div>
       </section>
+
+      <ConnectionBar status={status} transportKind={transportKind} error={error} />
 
       <Panel title="賽事設定">
         <div className="setup-grid">
@@ -113,11 +162,11 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
           <div className="field">
             <span>裁判數</span>
             <div className="segmented">
-              {[3, 5].map((count) => (
+              {profile.supportedJudgeCounts.map((count) => (
                 <button
                   key={count}
                   className={room.judgeCount === count ? 'active' : ''}
-                  onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { judgeCount: count as 3 | 5 } })}
+                  onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { judgeCount: count } })}
                 >
                   {count} 位裁判
                 </button>
@@ -149,16 +198,11 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
                   tone="secondary"
                   onClick={() =>
                     publish({
-                      type: 'UPDATE_SETTINGS',
-                      patch: {
-                        procedureDeductions: [
-                          ...room.procedureDeductions,
-                          createProcedureDeduction(rule, {
-                            id: `${rule.type}-${Date.now()}`,
-                            appliedAt: Date.now(),
-                          }),
-                        ],
-                      },
+                      type: 'APPLY_PENALTY',
+                      deduction: createProcedureDeduction(rule, {
+                        id: `${rule.type}-${Date.now()}`,
+                        appliedAt: Date.now(),
+                      }),
                     })
                   }
                 >
@@ -171,12 +215,7 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
               <Button
                 tone="secondary"
                 disabled={room.procedureDeductions.length === 0}
-                onClick={() =>
-                  publish({
-                    type: 'UPDATE_SETTINGS',
-                    patch: { procedureDeductions: room.procedureDeductions.slice(0, -1) },
-                  })
-                }
+                onClick={() => publish({ type: 'UNDO_PENALTY' })}
               >
                 復原
               </Button>
@@ -192,19 +231,27 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
 
       <div className="two-column">
         <Panel title="房間 QR Code">
-          <div className="qr-list">
-            <div className="qr-card">
-              <QrCode value={appLink(`/display/${room.roomCode}`)} />
-              <strong>公開顯示端</strong>
-            </div>
-            {slots.map((slot) => (
-              <div className="qr-card" key={slot}>
-                <QrCode value={appLink(`/judge/${room.roomCode}/${slot}`)} />
-                <strong>{slot} 裁判端</strong>
-                <span>{room.judgeScores[slot] ? '已送出' : '未送出'}</span>
+          {tokens === null ? (
+            <Notice>沒有本裝置的主控授權碼，無法產生 QR Code。</Notice>
+          ) : (
+            <div className="qr-list">
+              <div className="qr-card">
+                <QrCode value={appLink(`/display/${room.roomCode}?token=${tokens.displayToken}`)} />
+                <strong>公開顯示端</strong>
               </div>
-            ))}
-          </div>
+              {slots.map((slot) => (
+                <div className="qr-card" key={slot}>
+                  <QrCode
+                    value={appLink(
+                      `/judge/${room.roomCode}/${slot}?token=${tokens.judgeTokens[slot] ?? ''}`,
+                    )}
+                  />
+                  <strong>{slot} 裁判端</strong>
+                  <span>{room.judgeScores[slot] ? '已送出' : '未送出'}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Panel>
 
         <Panel title="流程控制">
@@ -217,7 +264,10 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
               公布成績
             </Button>
             <Button tone="secondary" onClick={() => publish({ type: 'RESET' })}>
-              下一位選手
+              重新評分本位
+            </Button>
+            <Button onClick={() => publish({ type: 'NEXT_ATHLETE' })}>
+              下一位選手{upcoming ? `：${upcoming.name}` : ''}
             </Button>
           </div>
           <div className="status-grid">
@@ -239,6 +289,7 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
       <Panel title="主控成績">
         <p className="muted">
           {profile.name} · 已送出 {completeCount}/{room.judgeCount}
+          {completeCount === room.judgeCount ? ' · 所有裁判已完成' : ''}
         </p>
         {room.status === 'PUBLISHED' ? <ScoreSummary result={result} /> : <p>公布前不顯示個別裁判分數與暫時計算總分。</p>}
       </Panel>
@@ -248,28 +299,42 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
 
 export function JudgePage() {
   const { roomCode, slot } = useParams()
+  const [params] = useSearchParams()
   if (!roomCode || !slot) return <Navigate to="/control" replace />
-  return <JudgeRoom roomCode={roomCode.toUpperCase()} judgeSlot={slot.toUpperCase()} />
+  return (
+    <JudgeRoom
+      roomCode={roomCode.toUpperCase()}
+      judgeSlot={slot.toUpperCase()}
+      token={params.get('token') ?? ''}
+    />
+  )
 }
 
-function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: string }) {
-  const { state: room, publish } = useRoom(roomCode)
-  const profile = RULE_PROFILES[room.profileId] ?? WT_RECOGNIZED_2024_06_14
+function JudgeRoom({ roomCode, judgeSlot, token }: { roomCode: string; judgeSlot: string; token: string }) {
+  const { state: room, status, transportKind, error, publish } = useRoom(roomCode, {
+    role: 'JUDGE',
+    slot: judgeSlot,
+    token,
+  })
   const [deductions, setDeductions] = useState<number[]>([])
-  const [presentation, setPresentation] = useState<Record<string, number>>(() =>
-    Object.fromEntries(profile.scoring.presentationComponents.map((component) => [component.id, component.max])),
-  )
+  const [presentation, setPresentation] = useState<Record<string, number> | null>(null)
+
+  if (room === null) return <LoadingRoom roomCode={roomCode} />
+
+  const profile = RULE_PROFILES[room.profileId] ?? WT_RECOGNIZED_2024_06_14
+  const currentPresentation =
+    presentation ??
+    Object.fromEntries(profile.scoring.presentationComponents.map((item) => [item.id, item.max]))
   const locked = room.judgeScores[judgeSlot] !== undefined
-  const draft = useMemo<JudgeScoreInput>(
-    () => ({
-      judgeSlot,
-      minorMistakes: deductions.filter((value) => value === profile.deductions.minorMistake).length,
-      majorMistakes: deductions.filter((value) => value === profile.deductions.majorMistake).length,
-      presentation,
-      submittedAt: 0,
-    }),
-    [deductions, judgeSlot, presentation, profile.deductions.majorMistake, profile.deductions.minorMistake],
-  )
+  const minorCount = deductions.filter((value) => value === profile.deductions.minorMistake).length
+  const majorCount = deductions.filter((value) => value === profile.deductions.majorMistake).length
+  const draft: JudgeScoreInput = {
+    judgeSlot,
+    minorMistakes: minorCount,
+    majorMistakes: majorCount,
+    presentation: currentPresentation,
+    submittedAt: 0,
+  }
   const score = computeJudgeScore(profile, draft)
 
   function applyDeduction(value: number) {
@@ -285,8 +350,9 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
           <AppLogo />
           <h1>{judgeSlot} 裁判端</h1>
           <p className="subtitle">
-            房間 {room.roomCode} · {room.athleteName} · {room.poomsaeName}
+            房間 {room.roomCode} · {room.athleteName || '待定'} · {room.poomsaeName || '待定'}
           </p>
+          <ConnectionBar status={status} transportKind={transportKind} error={error} />
         </div>
       </section>
       {locked ? <Notice>此裁判分數已送出並鎖定。若需修改，請由主控端退回。</Notice> : null}
@@ -296,22 +362,37 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
           <strong>{formatPoints(score.accuracy)}</strong>
         </div>
         <div className="judge-actions">
-          <button className="deduct minor" disabled={locked} onClick={() => applyDeduction(profile.deductions.minorMistake)}>
-            小失誤 -0.1
+          <button
+            className="deduct minor"
+            disabled={locked}
+            onClick={() => applyDeduction(profile.deductions.minorMistake)}
+          >
+            小失誤 -{formatPoints(profile.deductions.minorMistake)}
           </button>
-          <button className="deduct major" disabled={locked} onClick={() => applyDeduction(profile.deductions.majorMistake)}>
-            大失誤 -0.3
+          <button
+            className="deduct major"
+            disabled={locked}
+            onClick={() => applyDeduction(profile.deductions.majorMistake)}
+          >
+            大失誤 -{formatPoints(profile.deductions.majorMistake)}
           </button>
-          <button className="deduct undo" disabled={locked || deductions.length === 0} onClick={() => setDeductions((items) => items.slice(0, -1))}>
+          <button
+            className="deduct undo"
+            disabled={locked || deductions.length === 0}
+            onClick={() => setDeductions((items) => items.slice(0, -1))}
+          >
             復原
           </button>
         </div>
-        <p className="muted">最近一次：{deductions.length ? `-${formatPoints(deductions[deductions.length - 1] ?? 0)}` : '尚無扣分'}</p>
+        {/* 一眼看懂扣了幾次，不必自己數 */}
+        <p className="muted">
+          Minor × {minorCount} ／ Major × {majorCount}
+        </p>
       </Panel>
       <Panel title="表現性">
         <div className="component-list">
           {profile.scoring.presentationComponents.map((component) => {
-            const value = presentation[component.id] ?? component.max
+            const value = currentPresentation[component.id] ?? component.max
             return (
               <div className="component-row" key={component.id}>
                 <span>{component.name}</span>
@@ -319,7 +400,12 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
                   <Button
                     tone="secondary"
                     disabled={locked}
-                    onClick={() => setPresentation((current) => ({ ...current, [component.id]: Math.max(0, value - component.step) }))}
+                    onClick={() =>
+                      setPresentation({
+                        ...currentPresentation,
+                        [component.id]: Math.max(0, value - component.step),
+                      })
+                    }
                   >
                     -
                   </Button>
@@ -328,10 +414,10 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
                     tone="secondary"
                     disabled={locked}
                     onClick={() =>
-                      setPresentation((current) => ({
-                        ...current,
+                      setPresentation({
+                        ...currentPresentation,
                         [component.id]: Math.min(component.max, value + component.step),
-                      }))
+                      })
                     }
                   >
                     +
@@ -349,7 +435,14 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
       <div className="sticky-submit">
         <Button
           disabled={locked || room.status !== 'WAITING_FOR_SUBMISSIONS'}
-          onClick={() => publish({ type: 'SUBMIT_SCORE', score: { ...draft, submittedAt: Date.now() } })}
+          onClick={() =>
+            publish({
+              type: 'SUBMIT_SCORE',
+              // 同一輪的 submissionId 固定，狂按送出／網路重送都只會算一筆
+              submissionId: submissionIdFor(judgeSlot, roundKey(room)),
+              score: { ...draft, submittedAt: Date.now() },
+            })
+          }
         >
           確認送出
         </Button>
@@ -360,12 +453,15 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
 
 export function DisplayPage() {
   const { roomCode } = useParams()
+  const [params] = useSearchParams()
   if (!roomCode) return <Navigate to="/control" replace />
-  return <DisplayRoom roomCode={roomCode.toUpperCase()} />
+  return <DisplayRoom roomCode={roomCode.toUpperCase()} token={params.get('token') ?? ''} />
 }
 
-function DisplayRoom({ roomCode }: { roomCode: string }) {
-  const { state: room } = useRoom(roomCode)
+function DisplayRoom({ roomCode, token }: { roomCode: string; token: string }) {
+  const { state: room, status, transportKind, error } = useRoom(roomCode, { role: 'DISPLAY', token })
+  if (room === null) return <LoadingRoom roomCode={roomCode} />
+
   const result = scoreRoom(room)
   const slots = judgeSlots(room.judgeCount)
 
@@ -373,16 +469,17 @@ function DisplayRoom({ roomCode }: { roomCode: string }) {
     <main className="display-shell">
       <section>
         <AppLogo />
-        <h1>{room.athleteName}</h1>
+        <h1>{room.athleteName || '待上場'}</h1>
         <p className="display-meta">
           {room.teamName} · {room.poomsaeName} · {room.status}
         </p>
+        <ConnectionBar status={status} transportKind={transportKind} error={error} />
       </section>
       <section className="display-status">
         {slots.map((slot) => (
           <div className="display-judge" key={slot}>
             <span>{slot}</span>
-            <strong>{room.judgeScores[slot] ? '已送出' : '等待'}</strong>
+            <strong>{room.judgeScores[slot] ? '●' : '○'}</strong>
           </div>
         ))}
       </section>
@@ -391,7 +488,7 @@ function DisplayRoom({ roomCode }: { roomCode: string }) {
           <ScoreSummary result={result} />
         </section>
       ) : (
-        <Notice>評分期間僅顯示裁判連線與送出狀態，公布前不顯示分數。</Notice>
+        <Notice>評分期間僅顯示裁判送出狀態，公布前不顯示任何分數。</Notice>
       )}
     </main>
   )
@@ -419,3 +516,5 @@ function ScoreSummary({ result }: { result: ReturnType<typeof scoreRoom> }) {
     </div>
   )
 }
+
+export type { RoomState }

@@ -32,37 +32,45 @@
 
 **不需要 Supabase，可完全驗證。**
 
-### P0-2 Room domain 重建 🚧
+### P0-2 Room domain 重建 ✅
 
 - [x] 修 `RESET` 摧毀 `lastSequence` / `appliedEventIds` 的 bug（含回歸測試）
 - [x] 「下一位選手」保留 Room / 比賽設定 / 選手姓名，只清評分與程序扣分
 - [x] `judgeCount` 型別統一為 `JudgeCount`，可容納 7 判
-- [ ] **選手 Queue**：新增、排序、跳過、重新上場、自動帶入下一位
-- [ ] 真正的 **idempotency**：`submissionId` 由裁判端穩定生成，重送不產生第二筆
-- [ ] **結構化 audit log**：`ROOM_CREATED` / `ATHLETE_STARTED` / `JUDGE_SUBMITTED` /
-      `JUDGE_REOPENED` / `SCORE_LOCKED` / `SCORE_REVEALED` / `ATHLETE_CHANGED`
-      （目前仍是 `string[]`，且只有 `RETURN_SCORE` 會寫入）
+- [x] **選手 Queue**：`QUEUE_REPLACED` / `QUEUE_REORDERED` / `NEXT_ATHLETE` / `SKIP_ATHLETE`，
+      換人自動帶入姓名/單位/品勢，重排時遺漏的人不會消失
+- [x] 真正的 **idempotency**：`submissionId = slot:round`，狂按送出只會算一筆；
+      退回該裁判時會清掉他的 submissionId，才補得回分數
+- [x] **結構化 audit log**：`AuditEntry[]`，涵蓋 `ROOM_CREATED` / `ATHLETE_STARTED` /
+      `JUDGE_SUBMITTED` / `JUDGE_REOPENED` / `SCORE_LOCKED` / `SCORE_REVEALED` /
+      `ATHLETE_CHANGED` / `PENALTY_APPLIED` / `PENALTY_UNDONE` / `QUEUE_UPDATED` / `DENIED`
 
 **不需要 Supabase，可完全驗證。**
 
-### P0-3 角色與 Token ⬜
+### P0-3 角色與 Token ✅
 
-- [ ] `createRoom()` 產生 `hostToken` / `judgeToken[]` / `displayToken`
-- [ ] Token 用 `crypto.getRandomValues` 產生，至少 128 bit，**不可是 `J1`/`J2`**
-- [ ] 路由改為 `/judge/:roomCode?judge=J1&token=xxx`
-- [ ] Reducer 層驗證：JUDGE 事件必須附正確 token 且只能改自己的 slot
-- [ ] Display token 只換到唯讀投影
+- [x] `createRoom()` 產生 `hostToken` / `judgeTokens[J1..J7]` / `displayToken`
+- [x] Token 用 `crypto.getRandomValues` 產生 128 bit hex，**不是 `J1`/`J2`**
+- [x] 路由 `/judge/:roomCode/:slot?token=xxx`，QR Code 由主控端帶 token 發出
+- [x] Reducer 驗證：JUDGE 只能送自己的 slot；HOST 不能代送分；DISPLAY 唯讀
+- [x] 越權事件不推進 `lastSequence`（否則偽造大 sequence 就能卡死房間），並寫入 `DENIED`
+- [x] Host token 存本機，重整後仍保有主控權；換裝置則明確拒絕
+- [x] **token 絕不進入共享 snapshot**（`sanitizeRoomState`），資料庫只存 SHA-256 hash
 
-### P0-4 Room Realtime Transport 🔴
+### P0-4 Room Realtime Transport 🚧 程式碼完成，待憑證驗收
 
-- [ ] 抽 `RoomTransport` 介面（比照 `TrainingRealtimeTransport`）
-- [ ] `SupabaseRoomTransport`：private channel + snapshot 表 + presence
-- [ ] `LocalRoomTransport`：保留為離線 fallback，但 UI 必須誠實標示
-- [ ] SQL migration：`competition_rooms` / `competition_scores` + RLS + token 驗證
-- [ ] Reconnect：斷線重連後房間、身分、已送分數都還在
+- [x] 抽 `RoomTransport` 介面（比照 `TrainingRealtimeTransport`）
+- [x] `SupabaseRoomTransport`：RPC 寫入 + postgres_changes 訂閱 + 連線狀態回報
+- [x] `LocalRoomTransport`：保留為 fallback，UI 明確標示「🟠 本機模式」
+- [x] SQL migration `202608101_competition_rooms.sql`：
+      `competition_rooms` / `competition_room_secrets` / `competition_room_events`
+      + RLS + 三個 security definer 函式做伺服器端 token 驗證
+- [x] 權威模型：Host 跑 reducer 寫 snapshot，計分規則只有 TypeScript 一份
+- [x] Host 重整後由本機 token 復原主控權
+- [ ] **端對端驗收**（需要憑證，見 `SUPABASE_SETUP.md`）
+- [ ] Reconnect 實測：手機切 4G、鎖屏、Display refresh
 
-🔴 **阻塞於 Supabase 憑證**（CURRENT_STATE §7 BLOCKER-1）。
-程式碼與 migration 可以先寫完，但無法端對端驗證，正式站也不會生效。
+🟡 **待你完成 `docs/SUPABASE_SETUP.md` 的 6 個步驟**，這一項才能標成 ✅。
 
 ### P0-5 三角色 UI 拆分與重做 ⬜
 
