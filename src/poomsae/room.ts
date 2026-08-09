@@ -1,4 +1,6 @@
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../rules/profiles'
+import type { JudgeCount } from '../rules/profiles'
+import type { ProcedureDeduction } from '../rules/penalties'
 import type { JudgeScoreInput, PerformanceScoreResult } from './scoring'
 import { computePerformanceScore } from './scoring'
 
@@ -7,11 +9,12 @@ export type RoomStatus = 'SETUP' | 'WAITING_FOR_SUBMISSIONS' | 'SCORES_LOCKED' |
 export interface RoomState {
   roomCode: string
   profileId: string
-  judgeCount: 3 | 5
+  judgeCount: JudgeCount
   athleteName: string
   teamName: string
   poomsaeName: string
-  procedureDeductions: number
+  /** 型別化的程序扣分清單；不要退回單一數字，報表需要知道扣分原因 */
+  procedureDeductions: ProcedureDeduction[]
   status: RoomStatus
   judgeScores: Record<string, JudgeScoreInput>
   auditLog: string[]
@@ -44,7 +47,7 @@ export function generateRoomCode(): string {
   return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('')
 }
 
-export function judgeSlots(count: 3 | 5): string[] {
+export function judgeSlots(count: JudgeCount): string[] {
   return Array.from({ length: count }, (_, index) => `J${index + 1}`)
 }
 
@@ -56,7 +59,7 @@ export function createRoom(roomCode = generateRoomCode()): RoomState {
     athleteName: '選手 A',
     teamName: 'TeamPro',
     poomsaeName: '太極八章',
-    procedureDeductions: 0,
+    procedureDeductions: [],
     status: 'SETUP',
     judgeScores: {},
     auditLog: [],
@@ -98,7 +101,20 @@ export function reduceRoom(state: RoomState, event: RoomEvent): RoomState {
       if (state.status !== 'SCORES_LOCKED') return base
       return { ...base, status: 'PUBLISHED' }
     case 'RESET':
-      return { ...createRoom(state.roomCode), profileId: state.profileId, judgeCount: state.judgeCount }
+      /*
+       * 「下一位選手」只清掉這一輪的評分，其餘一律保留。
+       *
+       * 這裡必須從 `base` 展開，不能用 createRoom() 重建：
+       * createRoom() 會把 lastSequence 歸零、appliedEventIds 清空，
+       * 於是一個延遲抵達的舊事件（例如上一位選手 sequence 12 的 SUBMIT_SCORE）
+       * 不再被 `sequence <= lastSequence` 擋下，會被當成新事件套用到下一位身上。
+       */
+      return {
+        ...base,
+        status: 'SETUP',
+        judgeScores: {},
+        procedureDeductions: [],
+      }
   }
 }
 

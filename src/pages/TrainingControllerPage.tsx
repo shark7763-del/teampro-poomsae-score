@@ -3,10 +3,14 @@ import { Link, useParams } from 'react-router'
 import { AppLogo } from '../components/AppLogo'
 import { TvUrlHint } from '../components/TvUrlHint'
 import { Button, Notice, Panel, TextField } from '../components/ui'
-import { formatScore } from '../poomsae/scoring'
 import { elapsedSeconds } from '../training/state'
 import { useTrainingController } from '../training/useTrainingRealtime'
 import type { DisplayMode } from '../training/types'
+
+/** 訓練線的分數是「十分位整數」(20 = 2.0)，與比賽線的百分位不同，所以自己格式化。 */
+function formatTenths(points: number): string {
+  return (points / 10).toFixed(1)
+}
 
 function formatTime(totalSeconds: number): string {
   return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`
@@ -156,7 +160,7 @@ export function TrainingControllerPage({
                 <span>{label}</span>
                 <div className="stepper-row">
                   <Button tone="secondary" onClick={() => void controller.updateTraining({ presentation: { ...state.presentation, [typedKey]: Math.max(0, value - 1) } })}>-</Button>
-                  <strong>{formatScore(value)}</strong>
+                  <strong>{formatTenths(value)}</strong>
                   <Button tone="secondary" onClick={() => void controller.updateTraining({ presentation: { ...state.presentation, [typedKey]: Math.min(20, value + 1) } })}>+</Button>
                 </div>
               </div>

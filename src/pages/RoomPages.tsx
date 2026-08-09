@@ -4,10 +4,11 @@ import { AppLogo } from '../components/AppLogo'
 import { QrCode } from '../components/QrCode'
 import { Button, Notice, Panel, TextField } from '../components/ui'
 import type { JudgeScoreInput } from '../poomsae/scoring'
-import { computeJudgeScore, formatScore } from '../poomsae/scoring'
+import { computeJudgeScore, formatPoints } from '../poomsae/scoring'
 import { generateRoomCode, judgeSlots, scoreRoom } from '../poomsae/room'
 import { useRoom } from '../poomsae/useRoom'
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../rules/profiles'
+import { createProcedureDeduction, totalProcedureDeduction } from '../rules/penalties'
 
 function appLink(path: string): string {
   return `${window.location.origin}${window.location.pathname}#${path}`
@@ -140,21 +141,51 @@ function ControlRoom({ roomCode }: { roomCode: string }) {
           />
           <div className="field">
             <span>程序扣分</span>
+            {/* 按鈕由 RuleProfile 產生，數值不在 UI 硬編碼；每一筆都保留扣分原因 */}
             <div className="stepper-row">
+              {profile.procedureDeductions.map((rule) => (
+                <Button
+                  key={rule.type}
+                  tone="secondary"
+                  onClick={() =>
+                    publish({
+                      type: 'UPDATE_SETTINGS',
+                      patch: {
+                        procedureDeductions: [
+                          ...room.procedureDeductions,
+                          createProcedureDeduction(rule, {
+                            id: `${rule.type}-${Date.now()}`,
+                            appliedAt: Date.now(),
+                          }),
+                        ],
+                      },
+                    })
+                  }
+                >
+                  {rule.label} -{formatPoints(rule.value)}
+                </Button>
+              ))}
+            </div>
+            <div className="stepper-row">
+              <strong>-{formatPoints(totalProcedureDeduction(room.procedureDeductions))}</strong>
               <Button
                 tone="secondary"
-                onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { procedureDeductions: room.procedureDeductions - 3 } })}
+                disabled={room.procedureDeductions.length === 0}
+                onClick={() =>
+                  publish({
+                    type: 'UPDATE_SETTINGS',
+                    patch: { procedureDeductions: room.procedureDeductions.slice(0, -1) },
+                  })
+                }
               >
-                -0.3
-              </Button>
-              <strong>{formatScore(room.procedureDeductions)}</strong>
-              <Button
-                tone="secondary"
-                onClick={() => publish({ type: 'UPDATE_SETTINGS', patch: { procedureDeductions: room.procedureDeductions + 3 } })}
-              >
-                +0.3
+                復原
               </Button>
             </div>
+            <p className="muted">
+              {room.procedureDeductions.length === 0
+                ? '尚無程序扣分'
+                : room.procedureDeductions.map((item) => item.label).join('、')}
+            </p>
           </div>
         </div>
       </Panel>
@@ -262,7 +293,7 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
       <Panel title="正確性">
         <div className="score-readout">
           <span>目前分數</span>
-          <strong>{formatScore(score.accuracy)}</strong>
+          <strong>{formatPoints(score.accuracy)}</strong>
         </div>
         <div className="judge-actions">
           <button className="deduct minor" disabled={locked} onClick={() => applyDeduction(profile.deductions.minorMistake)}>
@@ -275,7 +306,7 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
             復原
           </button>
         </div>
-        <p className="muted">最近一次：{deductions.length ? `-${formatScore(deductions[deductions.length - 1] ?? 0)}` : '尚無扣分'}</p>
+        <p className="muted">最近一次：{deductions.length ? `-${formatPoints(deductions[deductions.length - 1] ?? 0)}` : '尚無扣分'}</p>
       </Panel>
       <Panel title="表現性">
         <div className="component-list">
@@ -292,7 +323,7 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
                   >
                     -
                   </Button>
-                  <strong>{formatScore(value)}</strong>
+                  <strong>{formatPoints(value)}</strong>
                   <Button
                     tone="secondary"
                     disabled={locked}
@@ -312,7 +343,7 @@ function JudgeRoom({ roomCode, judgeSlot }: { roomCode: string; judgeSlot: strin
         </div>
         <div className="score-readout">
           <span>表現性小計</span>
-          <strong>{formatScore(score.presentation)}</strong>
+          <strong>{formatPoints(score.presentation)}</strong>
         </div>
       </Panel>
       <div className="sticky-submit">
@@ -371,19 +402,19 @@ function ScoreSummary({ result }: { result: ReturnType<typeof scoreRoom> }) {
     <div className="score-summary">
       <div>
         <span>正確性</span>
-        <strong>{formatScore(result.accuracy)}</strong>
+        <strong>{formatPoints(result.accuracy)}</strong>
       </div>
       <div>
         <span>表現性</span>
-        <strong>{formatScore(result.presentation)}</strong>
+        <strong>{formatPoints(result.presentation)}</strong>
       </div>
       <div>
         <span>程序扣分</span>
-        <strong>{formatScore(result.procedureDeductions)}</strong>
+        <strong>{formatPoints(result.procedureDeductions)}</strong>
       </div>
       <div className="final">
         <span>最終總分</span>
-        <strong>{formatScore(result.total)}</strong>
+        <strong>{formatPoints(result.total)}</strong>
       </div>
     </div>
   )

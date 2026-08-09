@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { AppLogo } from '../../components/AppLogo'
 import { Button, Notice, Panel, TextField } from '../../components/ui'
 import { RULE_PROFILES, WT_RECOGNIZED_2024_06_14 } from '../../rules/profiles'
+import type { RuleProfile } from '../../rules/profiles'
 import type { JudgeCount, JudgeScoreInput } from '../../poomsae/scoring'
-import { computeJudgeScore, computePerformanceScore, formatScore } from '../../poomsae/scoring'
+import { computeJudgeScore, computePerformanceScore, formatPoints } from '../../poomsae/scoring'
+import type { ProcedureDeduction } from '../../rules/penalties'
+import { createProcedureDeduction, totalProcedureDeduction } from '../../rules/penalties'
 
 const MAX_JUDGES = 5
 
@@ -12,7 +15,7 @@ function createJudge(slot: string): JudgeScoreInput {
     judgeSlot: slot,
     minorMistakes: 0,
     majorMistakes: 0,
-    presentation: { speed_power: 20, rhythm_tempo: 20, energy_expression: 20 },
+    presentation: { speed_power: 200, rhythm_tempo: 200, energy_expression: 200 },
     submittedAt: 0,
   }
 }
@@ -23,7 +26,7 @@ export function Calculator(): React.ReactElement {
   const [athleteName, setAthleteName] = useState('選手 A')
   const [teamName, setTeamName] = useState('TeamPro')
   const [poomsaeName, setPoomsaeName] = useState('太極八章')
-  const [procedureDeductions, setProcedureDeductions] = useState(0)
+  const [procedureDeductions, setProcedureDeductions] = useState<ProcedureDeduction[]>([])
   const [judges, setJudges] = useState<JudgeScoreInput[]>(
     Array.from({ length: MAX_JUDGES }, (_, index) => createJudge(`J${index + 1}`)),
   )
@@ -72,12 +75,38 @@ export function Calculator(): React.ReactElement {
               5 位裁判
             </Button>
           </div>
-          <div className="grid grid-cols-[1fr_80px_1fr] gap-2">
-            <Button onClick={() => setProcedureDeductions((value) => Math.max(0, value - 3))}>-0.3</Button>
-            <div className="flex items-center justify-center rounded-lg bg-panel-2 text-2xl font-black">
-              {formatScore(procedureDeductions)}
+          {/* 程序扣分按鈕由 RuleProfile 產生，扣分原因會一起記錄下來 */}
+          <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {profile.procedureDeductions.map((rule) => (
+                <Button
+                  key={rule.type}
+                  onClick={() =>
+                    setProcedureDeductions((current) => [
+                      ...current,
+                      createProcedureDeduction(rule, {
+                        id: `${rule.type}-${Date.now()}`,
+                        appliedAt: Date.now(),
+                      }),
+                    ])
+                  }
+                >
+                  {rule.label} -{formatPoints(rule.value)}
+                </Button>
+              ))}
             </div>
-            <Button onClick={() => setProcedureDeductions((value) => value + 3)}>+0.3</Button>
+            <div className="grid grid-cols-[1fr_80px] gap-2">
+              <Button
+                tone="secondary"
+                disabled={procedureDeductions.length === 0}
+                onClick={() => setProcedureDeductions((current) => current.slice(0, -1))}
+              >
+                復原扣分
+              </Button>
+              <div className="flex items-center justify-center rounded-lg bg-panel-2 text-2xl font-black">
+                {formatPoints(totalProcedureDeduction(procedureDeductions))}
+              </div>
+            </div>
           </div>
         </div>
       </Panel>
@@ -92,6 +121,7 @@ export function Calculator(): React.ReactElement {
                 result.judges.find((item) => item.judgeSlot === judge.judgeSlot)?.excludedPresentation
               }
               onChange={(next) => updateJudge(index, next)}
+              profile={profile}
             />
           ))}
         </div>
@@ -124,19 +154,26 @@ export function JudgeEditor({
   onChange,
   excludedAccuracy,
   excludedPresentation,
+  profile = WT_RECOGNIZED_2024_06_14,
 }: {
   judge: JudgeScoreInput
   onChange: (judge: JudgeScoreInput) => void
   excludedAccuracy?: boolean
   excludedPresentation?: boolean
+  profile?: RuleProfile
 }): React.ReactElement {
-  const score = computeJudgeScore(WT_RECOGNIZED_2024_06_14, judge)
+  const score = computeJudgeScore(profile, judge)
   const changePresentation = (componentId: string, delta: number): void => {
+    const component = profile.scoring.presentationComponents.find((item) => item.id === componentId)
+    if (component === undefined) return
     onChange({
       ...judge,
       presentation: {
         ...judge.presentation,
-        [componentId]: Math.max(0, Math.min(20, (judge.presentation[componentId] ?? 0) + delta)),
+        [componentId]: Math.max(
+          0,
+          Math.min(component.max, (judge.presentation[componentId] ?? 0) + delta * component.step),
+        ),
       },
     })
   }
@@ -145,10 +182,10 @@ export function JudgeEditor({
       <div className="grid gap-3 lg:grid-cols-[220px_1fr_140px]">
         <div className="grid gap-2">
           <Button onClick={() => onChange({ ...judge, minorMistakes: judge.minorMistakes + 1 })} tone="warning">
-            小失誤 -0.1
+            小失誤 -{formatPoints(profile.deductions.minorMistake)}
           </Button>
           <Button onClick={() => onChange({ ...judge, majorMistakes: judge.majorMistakes + 1 })} tone="danger">
-            大失誤 -0.3
+            大失誤 -{formatPoints(profile.deductions.majorMistake)}
           </Button>
           <Button
             onClick={() => onChange({ ...judge, minorMistakes: Math.max(0, judge.minorMistakes - 1) })}
@@ -162,21 +199,15 @@ export function JudgeEditor({
           </Button>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
-          {(
-            [
-            ['speed_power', '速度與力量'],
-            ['rhythm_tempo', '節奏與速度控制'],
-            ['energy_expression', '氣勢表現'],
-            ] as const
-          ).map(([id, name]) => (
-            <div key={id} className="rounded-lg border border-line bg-panel-2 p-2">
-              <p className="min-h-[40px] text-sm font-black">{name}</p>
+          {profile.scoring.presentationComponents.map((component) => (
+            <div key={component.id} className="rounded-lg border border-line bg-panel-2 p-2">
+              <p className="min-h-[40px] text-sm font-black">{component.name}</p>
               <div className="mt-2 grid grid-cols-[56px_1fr_56px] gap-2">
-                <Button onClick={() => changePresentation(id, -1)}>-</Button>
+                <Button onClick={() => changePresentation(component.id, -1)}>-</Button>
                 <div className="flex items-center justify-center rounded-lg bg-black/20 text-2xl font-black">
-                  {formatScore(judge.presentation[id] ?? 0)}
+                  {formatPoints(judge.presentation[component.id] ?? 0)}
                 </div>
-                <Button onClick={() => changePresentation(id, 1)}>+</Button>
+                <Button onClick={() => changePresentation(component.id, 1)}>+</Button>
               </div>
             </div>
           ))}
@@ -214,7 +245,7 @@ export function ScoreCard({
         <p className="text-sm text-slate-400">{teamName}</p>
         <p className="text-3xl font-black">{athleteName}</p>
         <p className="mt-1 text-slate-400">{poomsaeName}</p>
-        <p className="mt-4 text-7xl font-black text-emerald-300 tabular">{formatScore(total)}</p>
+        <p className="mt-4 text-7xl font-black text-emerald-300 tabular">{formatPoints(total)}</p>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <MiniScore label="正確性" value={accuracy} />
@@ -229,7 +260,7 @@ function MiniScore({ label, value, excluded = false }: { label: string; value: n
   return (
     <div className="rounded-lg border border-line bg-panel-2 p-2 text-center">
       <p className="text-xs text-slate-400">{label}</p>
-      <p className="text-2xl font-black tabular">{formatScore(value)}</p>
+      <p className="text-2xl font-black tabular">{formatPoints(value)}</p>
       {excluded && <p className="text-xs font-black text-amber-300">已排除</p>}
     </div>
   )

@@ -1,0 +1,151 @@
+# IMPLEMENTATION_PLAN — TeamPro Poomsae Score
+
+依據 [`CURRENT_STATE.md`](./CURRENT_STATE.md) 的盤點結果。
+原則：**refactor 現有程式碼，不重寫**；每個階段結束都要 `lint / typecheck / test / build` 全綠才進下一階段。
+
+---
+
+## 進度標記
+
+| 狀態 | 意義 |
+| --- | --- |
+| ✅ | 已完成並驗證（測試綠 + build 過） |
+| 🚧 | 進行中 |
+| ⬜ | 未開始 |
+| 🔴 | 被阻塞（見 CURRENT_STATE §7） |
+
+---
+
+## P0 — 核心：真 Realtime、角色、計分可靠度
+
+沒有 P0，這套系統就只是 demo。
+
+### P0-1 Scoring Engine 重建 ✅
+
+- [x] 內部精度從 ×10 改為 **×100**，可正確表達 `7.63`
+- [x] `formatScore()` 支援 2 位小數；分項顯示維持可讀
+- [x] `JudgeCount` 統一為 `1 | 3 | 5 | 7`（Training 1/3/5、WT Simulation 5/7）
+- [x] Trimming 規則由 RuleProfile 驅動，支援 7 判
+- [x] **Tie-break 引擎**：`higher_presentation` → `include_trimmed_scores` → `rematch_required`
+- [x] **Typed procedure deduction**：`{ type: 'BOUNDARY', value: -30 }`，UI 不得硬編碼數值
+- [x] 單元測試涵蓋：0.01 精度、1/3/5/7 判、去頭尾、同分三層判定、重複送出
+
+**不需要 Supabase，可完全驗證。**
+
+### P0-2 Room domain 重建 🚧
+
+- [x] 修 `RESET` 摧毀 `lastSequence` / `appliedEventIds` 的 bug（含回歸測試）
+- [x] 「下一位選手」保留 Room / 比賽設定 / 選手姓名，只清評分與程序扣分
+- [x] `judgeCount` 型別統一為 `JudgeCount`，可容納 7 判
+- [ ] **選手 Queue**：新增、排序、跳過、重新上場、自動帶入下一位
+- [ ] 真正的 **idempotency**：`submissionId` 由裁判端穩定生成，重送不產生第二筆
+- [ ] **結構化 audit log**：`ROOM_CREATED` / `ATHLETE_STARTED` / `JUDGE_SUBMITTED` /
+      `JUDGE_REOPENED` / `SCORE_LOCKED` / `SCORE_REVEALED` / `ATHLETE_CHANGED`
+      （目前仍是 `string[]`，且只有 `RETURN_SCORE` 會寫入）
+
+**不需要 Supabase，可完全驗證。**
+
+### P0-3 角色與 Token ⬜
+
+- [ ] `createRoom()` 產生 `hostToken` / `judgeToken[]` / `displayToken`
+- [ ] Token 用 `crypto.getRandomValues` 產生，至少 128 bit，**不可是 `J1`/`J2`**
+- [ ] 路由改為 `/judge/:roomCode?judge=J1&token=xxx`
+- [ ] Reducer 層驗證：JUDGE 事件必須附正確 token 且只能改自己的 slot
+- [ ] Display token 只換到唯讀投影
+
+### P0-4 Room Realtime Transport 🔴
+
+- [ ] 抽 `RoomTransport` 介面（比照 `TrainingRealtimeTransport`）
+- [ ] `SupabaseRoomTransport`：private channel + snapshot 表 + presence
+- [ ] `LocalRoomTransport`：保留為離線 fallback，但 UI 必須誠實標示
+- [ ] SQL migration：`competition_rooms` / `competition_scores` + RLS + token 驗證
+- [ ] Reconnect：斷線重連後房間、身分、已送分數都還在
+
+🔴 **阻塞於 Supabase 憑證**（CURRENT_STATE §7 BLOCKER-1）。
+程式碼與 migration 可以先寫完，但無法端對端驗證，正式站也不會生效。
+
+### P0-5 三角色 UI 拆分與重做 ⬜
+
+- [ ] `RoomPages.tsx` 拆成 `pages/host/` `pages/judge/` `pages/display/`
+- [ ] Judge：Minor/Major/Undo 大按鈕 + `Minor × N / Major × N` 即時統計 + 連線燈號
+- [ ] Judge：Presentation 改為快速扣分而非 17 次 stepper
+- [ ] Host：選手 Queue + 裁判在線/送分狀態 + Penalty 快捷 + 超大「下一位」
+- [ ] Display：16:9、超大字、公布動畫、RANK
+- [ ] 連線狀態燈號 🟢🟡🔴 三端都要有
+
+### P0-6 誠實的離線提示 ⬜
+
+- [ ] 沒有 Supabase 憑證時，首頁明確顯示「本機模式，跨裝置不會同步」
+- [ ] 離線時顯示「目前離線，等待重新連線」，**不得假裝已同步**
+
+### P0-7 測試升級 ⬜
+
+- [ ] E2E 改用**多個獨立 browser context** 模擬不同裝置
+- [ ] 情境：Host 建房 → 5 Judge 加入 → 送分 → Lock → Reveal → Next Athlete
+- [ ] 壓力：1 Host + 7 Judge + 1 Display，驗證無 race condition / duplicate / score lost
+- [ ] Reconnect 測試：中途 reload judge page，身分與已送分數還在
+
+---
+
+## P1 — 訓練價值
+
+### P1-1 訓練紀錄資料庫 ⬜
+Athletes / Sessions / Scores 三張表，記錄選手、日期、品勢、Accuracy、Presentation、Penalty、Total、Minor、Major。
+
+### P1-2 訓練結果畫面 ⬜
+本次 vs 上次對比、進步幅度（`+0.30`）。
+
+### P1-3 弱項分析 ⬜
+Accuracy / Presentation 趨勢，最近 5 次平均，指出主要弱項。**規則式，不接 AI API。**
+
+### P1-4 訓練建議 ⬜
+規則式文案（Minor 過多 → 設定下次目標 ≤ 4）。介面預留 AI 插槽。
+
+### P1-5 History 頁 ⬜
+列表 + 明細（各裁判分數、Accuracy / Presentation / Penalty）。
+
+### P1-6 成績卡輸出 ⬜
+PNG 優先、PDF 次之。含 TeamPro Logo、選手、日期、品勢、總分、分項。適合 LINE 分享。
+
+### P1-7 PWA 補完 ⬜
+確認 installable / offline shell。離線時 realtime 功能明確標示不可用。
+
+---
+
+## P2 — 賽事延伸
+
+### P2-1 Cut-off ⬜
+Preliminary / Semifinal / Final、排名、晉級。
+
+### P2-2 Tournament Mode ⬜
+Chung vs Hong 對戰，Display 顯示 `CHUNG VS HONG`，依 scoring 自動判勝。
+
+### P2-3 進階分析 ⬜
+跨選手、跨時間的統計。
+
+---
+
+## 每階段驗收指令
+
+```bash
+npm install
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e   # 需先 npx playwright install
+```
+
+失敗就直接修，不只回報。
+
+---
+
+## 最終驗收情境（P0 完成的定義）
+
+教練拿 iPad 建立 5 人裁判品勢測驗 → 系統產生 J1–J5 QR →
+5 位裁判用**各自的手機**掃描 → 電視開 Display →
+王小明上場 → 五位裁判評分 → Host 即時看到 5 個 ✅ →
+Host 鎖定並公布 → 電視立即顯示 →
+Host 點「下一位」→ 陳小華 → **五支手機不用重新加入**，直接評下一輪。
+
+這串流程在**不同實體裝置**上跑通，P0 才算完成。

@@ -1,9 +1,19 @@
-import type { RuleProfile } from './types'
+import type { PresentationComponent, ProcedureDeductionRule, RuleProfile } from './types'
 
-const presentationComponents = [
-  { id: 'speed_power', name: '速度與力量', max: 20, step: 1 },
-  { id: 'rhythm_tempo', name: '節奏與速度控制', max: 20, step: 1 },
-  { id: 'energy_expression', name: '氣勢表現', max: 20, step: 1 },
+/** 表現性三分項，各 2.00 分，合計 6.00。級距 0.1。 */
+const presentationComponents: PresentationComponent[] = [
+  { id: 'speed_power', name: '速度與力量', max: 200, step: 10 },
+  { id: 'rhythm_tempo', name: '節奏與速度控制', max: 200, step: 10 },
+  { id: 'energy_expression', name: '氣勢表現', max: 200, step: 10 },
+]
+
+/** 程序扣分快捷。Host UI 直接由此渲染，改規則只改這裡。 */
+const procedureDeductions: ProcedureDeductionRule[] = [
+  { type: 'RESTART', label: '重新開始', value: 60 },
+  { type: 'BOUNDARY', label: '出界', value: 30 },
+  { type: 'TIME', label: '時間', value: 30 },
+  { type: 'UNIFORM', label: '服裝儀容', value: 30 },
+  { type: 'CUSTOM', label: '其他', value: 10 },
 ]
 
 export const WT_RECOGNIZED_2024_06_14: RuleProfile = {
@@ -13,20 +23,20 @@ export const WT_RECOGNIZED_2024_06_14: RuleProfile = {
   effectiveDate: '2024-06-14',
   jurisdiction: 'WT / member association events unless overridden by event rules',
   category: 'recognized',
-  supportedJudgeCounts: [3, 5],
+  supportedJudgeCounts: [1, 3, 5, 7],
   scoring: {
-    accuracyMax: 40,
-    presentationMax: 60,
+    accuracyMax: 400,
+    presentationMax: 600,
     presentationComponents,
   },
   deductions: {
-    minorMistake: 1,
-    majorMistake: 3,
-    overtime: 3,
-    boundary: 3,
+    minorMistake: 10,
+    majorMistake: 30,
   },
+  procedureDeductions,
   trimming: {
-    enabledJudgeCounts: [5],
+    // 5 判與 7 判去掉最高與最低各一位；1/3 判人數太少，去除後樣本不足。
+    enabledJudgeCounts: [5, 7],
     removeHighest: 1,
     removeLowest: 1,
     calculateAccuracySeparately: true,
@@ -60,9 +70,35 @@ export const USATKD_RECOGNIZED_2026_01_01: RuleProfile = {
   ],
 }
 
-export const RULE_PROFILES = {
-  [WT_RECOGNIZED_2024_06_14.id]: WT_RECOGNIZED_2024_06_14,
-  [USATKD_RECOGNIZED_2026_01_01.id]: USATKD_RECOGNIZED_2026_01_01,
+/**
+ * TeamPro 訓練模式：沿用 WT 的計分結構，但明確標示為訓練用，
+ * 且不做去頭去尾（訓練時每位教練的意見都要保留）。
+ */
+export const TEAMPRO_TRAINING_2026: RuleProfile = {
+  ...WT_RECOGNIZED_2024_06_14,
+  id: 'TEAMPRO_TRAINING_2026',
+  organization: 'TeamPro',
+  name: 'TeamPro 訓練模式',
+  effectiveDate: '2026-01-01',
+  jurisdiction: '訓練、校隊測驗、道館模擬賽；非正式競賽',
+  supportedJudgeCounts: [1, 3, 5],
+  trimming: {
+    ...WT_RECOGNIZED_2024_06_14.trimming,
+    enabledJudgeCounts: [],
+  },
 }
 
-export type { RuleProfile }
+export const RULE_PROFILES: Record<string, RuleProfile> = {
+  [WT_RECOGNIZED_2024_06_14.id]: WT_RECOGNIZED_2024_06_14,
+  [USATKD_RECOGNIZED_2026_01_01.id]: USATKD_RECOGNIZED_2026_01_01,
+  [TEAMPRO_TRAINING_2026.id]: TEAMPRO_TRAINING_2026,
+}
+
+export type {
+  JudgeCount,
+  PresentationComponent,
+  ProcedureDeductionRule,
+  ProcedureDeductionType,
+  RuleProfile,
+  TieBreakRule,
+} from './types'
