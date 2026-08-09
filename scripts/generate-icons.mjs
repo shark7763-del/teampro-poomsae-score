@@ -1,17 +1,28 @@
 /**
- * 產生 PWA 圖示（純 Node，不需要任何影像套件）。
+ * 從品牌主視覺 public/teampro-poomsae-coach-logo.png 產生所有 favicon / PWA 圖示。
  *
- * 圖案：深色底 + 左藍右紅兩個方塊，對應計分板的固定版位，
- * 在手機主畫面上一眼就能認出是計分系統。
+ * 純 Node（只用內建 zlib），不需要 sharp 之類的影像套件，
+ * 這樣 CI 或別台電腦重跑也不會因為缺套件而把品牌圖示洗掉。
  *
  * 執行：node scripts/generate-icons.mjs
  */
-import { deflateSync } from 'node:zlib'
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { deflateSync, inflateSync } from 'node:zlib'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const PUBLIC_DIR = join(ROOT, 'public')
+const ICON_DIR = join(PUBLIC_DIR, 'icons')
+const SOURCE = join(PUBLIC_DIR, 'teampro-poomsae-coach-logo.png')
+
+/*
+ * 檔名帶版本號：換圖示時把 VERSION 加一並同步 index.html / vite.config.ts。
+ * 瀏覽器與 Android 主畫面對舊檔名的快取極黏，改路徑是最可靠的更新方式。
+ */
+const VERSION = 'v2'
+
+// ---------------------------------------------------------------- PNG 編解碼
 
 const CRC_TABLE = (() => {
   const table = new Int32Array(256)
@@ -38,25 +49,85 @@ function chunk(type, data) {
   return Buffer.concat([length, typeAndData, crc])
 }
 
-/** pixels: (x, y) => [r, g, b] */
-function encodePng(size, pixels) {
-  const raw = Buffer.alloc(size * (size * 3 + 1))
-  let offset = 0
-  for (let y = 0; y < size; y += 1) {
-    raw[offset] = 0 // filter type: none
-    offset += 1
-    for (let x = 0; x < size; x += 1) {
-      const [r, g, b] = pixels(x, y)
-      raw[offset] = r
-      raw[offset + 1] = g
-      raw[offset + 2] = b
-      offset += 3
+/** 解出 { width, height, rgb }，rgb 為 width*height*3 的 Buffer（丟棄 alpha，以黑底合成）。 */
+function decodePng(buffer) {
+  const width = buffer.readUInt32BE(16)
+  const height = buffer.readUInt32BE(20)
+  const depth = buffer[24]
+  const colorType = buffer[25]
+  const interlace = buffer[28]
+  if (depth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`只支援 8-bit 非交錯的 RGB/RGBA PNG（depth=${depth} color=${colorType})`)
+  }
+
+  const idat = []
+  let offset = 8
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset)
+    const type = buffer.toString('ascii', offset + 4, offset + 8)
+    if (type === 'IDAT') idat.push(buffer.subarray(offset + 8, offset + 8 + length))
+    if (type === 'IEND') break
+    offset += length + 12
+  }
+
+  const raw = inflateSync(Buffer.concat(idat))
+  const channels = colorType === 6 ? 4 : 3
+  const stride = width * channels
+  const pixels = Buffer.alloc(height * stride)
+
+  // PNG 逐列 filter 還原（filter type 0~4）
+  let pos = 0
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[pos]
+    pos += 1
+    const line = raw.subarray(pos, pos + stride)
+    pos += stride
+    const out = pixels.subarray(y * stride, (y + 1) * stride)
+    const prior = y > 0 ? pixels.subarray((y - 1) * stride, y * stride) : null
+    for (let i = 0; i < stride; i += 1) {
+      const a = i >= channels ? out[i - channels] : 0
+      const b = prior ? prior[i] : 0
+      const c = prior && i >= channels ? prior[i - channels] : 0
+      let value = line[i]
+      if (filter === 1) value += a
+      else if (filter === 2) value += b
+      else if (filter === 3) value += (a + b) >> 1
+      else if (filter === 4) {
+        const p = a + b - c
+        const pa = Math.abs(p - a)
+        const pb = Math.abs(p - b)
+        const pc = Math.abs(p - c)
+        value += pa <= pb && pa <= pc ? a : pb <= pc ? b : c
+      }
+      out[i] = value & 0xff
     }
   }
 
+  if (channels === 3) return { width, height, rgb: pixels }
+
+  const rgb = Buffer.alloc(width * height * 3)
+  for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
+    const alpha = pixels[i + 3] / 255
+    rgb[j] = Math.round(pixels[i] * alpha)
+    rgb[j + 1] = Math.round(pixels[i + 1] * alpha)
+    rgb[j + 2] = Math.round(pixels[i + 2] * alpha)
+  }
+  return { width, height, rgb }
+}
+
+function encodePng(width, height, rgb) {
+  const raw = Buffer.alloc(height * (width * 3 + 1))
+  let offset = 0
+  for (let y = 0; y < height; y += 1) {
+    raw[offset] = 0 // filter type: none
+    offset += 1
+    rgb.copy(raw, offset, y * width * 3, (y + 1) * width * 3)
+    offset += width * 3
+  }
+
   const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(size, 0)
-  ihdr.writeUInt32BE(size, 4)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
   ihdr[8] = 8 // bit depth
   ihdr[9] = 2 // colour type: truecolour
   ihdr[10] = 0
@@ -71,43 +142,89 @@ function encodePng(size, pixels) {
   ])
 }
 
-const INK = [5, 7, 12]
-const BLUE = [29, 111, 224]
-const RED = [224, 52, 44]
+// ------------------------------------------------------------------ 縮圖合成
 
-/** padding 為安全區比例，maskable 圖示需要較大留白 */
-function makeIcon(size, padding) {
-  const inset = Math.round(size * padding)
-  const inner = size - inset * 2
-  const gap = Math.max(2, Math.round(size * 0.045))
-  const blockWidth = Math.round((inner - gap) / 2)
-  const blockHeight = Math.round(inner * 0.62)
-  const top = Math.round((size - blockHeight) / 2)
+/** 面積平均（box filter）縮圖，縮很多倍時比取樣點乾淨得多。 */
+function resample(src, targetWidth, targetHeight) {
+  const out = Buffer.alloc(targetWidth * targetHeight * 3)
+  const scaleX = src.width / targetWidth
+  const scaleY = src.height / targetHeight
 
-  return encodePng(size, (x, y) => {
-    const inBand = y >= top && y < top + blockHeight
-    if (inBand) {
-      const blueStart = inset
-      const blueEnd = inset + blockWidth
-      const redStart = blueEnd + gap
-      const redEnd = redStart + blockWidth
-      if (x >= blueStart && x < blueEnd) return BLUE
-      if (x >= redStart && x < redEnd) return RED
+  for (let y = 0; y < targetHeight; y += 1) {
+    const y0 = Math.floor(y * scaleY)
+    const y1 = Math.max(y0 + 1, Math.min(src.height, Math.ceil((y + 1) * scaleY)))
+    for (let x = 0; x < targetWidth; x += 1) {
+      const x0 = Math.floor(x * scaleX)
+      const x1 = Math.max(x0 + 1, Math.min(src.width, Math.ceil((x + 1) * scaleX)))
+      let r = 0
+      let g = 0
+      let b = 0
+      let count = 0
+      for (let sy = y0; sy < y1; sy += 1) {
+        let idx = (sy * src.width + x0) * 3
+        for (let sx = x0; sx < x1; sx += 1) {
+          r += src.rgb[idx]
+          g += src.rgb[idx + 1]
+          b += src.rgb[idx + 2]
+          idx += 3
+          count += 1
+        }
+      }
+      const idx = (y * targetWidth + x) * 3
+      out[idx] = Math.round(r / count)
+      out[idx + 1] = Math.round(g / count)
+      out[idx + 2] = Math.round(b / count)
     }
-    return INK
-  })
+  }
+  return { width: targetWidth, height: targetHeight, rgb: out }
 }
 
-mkdirSync(OUT_DIR, { recursive: true })
+/**
+ * 產生正方形圖示。
+ * padding 為每邊留白比例：Android maskable 會把四角裁掉，
+ * 留白不夠的話「Poomsae Coach」字樣會被切掉，看起來就像換了一顆舊圖示。
+ */
+function makeIcon(src, size, padding, padColor) {
+  const inner = Math.max(1, Math.round(size * (1 - padding * 2)))
+  const scaled = resample(src, inner, inner)
+  if (inner === size) return { width: size, height: size, rgb: scaled.rgb }
+
+  const out = Buffer.alloc(size * size * 3)
+  for (let i = 0; i < size * size; i += 1) {
+    out[i * 3] = padColor[0]
+    out[i * 3 + 1] = padColor[1]
+    out[i * 3 + 2] = padColor[2]
+  }
+  const offset = Math.round((size - inner) / 2)
+  for (let y = 0; y < inner; y += 1) {
+    scaled.rgb.copy(out, ((y + offset) * size + offset) * 3, y * inner * 3, (y + 1) * inner * 3)
+  }
+  return { width: size, height: size, rgb: out }
+}
+
+// ---------------------------------------------------------------------- 輸出
+
+const source = decodePng(readFileSync(SOURCE))
+// 主視覺四角是純黑，補邊就取來源角落像素，maskable 放大裁切時看不出接縫
+const padColor = [source.rgb[0], source.rgb[1], source.rgb[2]]
+
+mkdirSync(ICON_DIR, { recursive: true })
 
 const outputs = [
-  ['icon-192.png', makeIcon(192, 0.12)],
-  ['icon-512.png', makeIcon(512, 0.12)],
-  ['icon-maskable-512.png', makeIcon(512, 0.22)],
-  ['apple-touch-icon.png', makeIcon(180, 0.1)],
+  [join(PUBLIC_DIR, `favicon-${VERSION}-32.png`), makeIcon(source, 32, 0, padColor)],
+  [join(PUBLIC_DIR, `favicon-${VERSION}-64.png`), makeIcon(source, 64, 0, padColor)],
+  [join(PUBLIC_DIR, `favicon-${VERSION}-180.png`), makeIcon(source, 180, 0, padColor)],
+  [join(ICON_DIR, `poomsae-coach-${VERSION}-192.png`), makeIcon(source, 192, 0, padColor)],
+  [join(ICON_DIR, `poomsae-coach-${VERSION}-512.png`), makeIcon(source, 512, 0, padColor)],
+  [
+    join(ICON_DIR, `poomsae-coach-${VERSION}-maskable-512.png`),
+    makeIcon(source, 512, 0.14, padColor),
+  ],
+  [join(ICON_DIR, `poomsae-coach-${VERSION}-apple-touch.png`), makeIcon(source, 180, 0, padColor)],
 ]
 
-for (const [name, buffer] of outputs) {
-  writeFileSync(join(OUT_DIR, name), buffer)
-  console.log(`已產生 ${name}（${buffer.length} bytes）`)
+for (const [path, image] of outputs) {
+  const buffer = encodePng(image.width, image.height, image.rgb)
+  writeFileSync(path, buffer)
+  console.log(`已產生 ${path.slice(ROOT.length + 1)}（${buffer.length} bytes）`)
 }

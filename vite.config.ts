@@ -16,7 +16,13 @@ export default defineConfig(({ command }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['teampro-poomsae-coach-logo.png', 'icons/poomsae-coach-apple-touch.png'],
+      includeAssets: [
+        'teampro-poomsae-coach-logo.png',
+        'favicon-v2-32.png',
+        'favicon-v2-64.png',
+        'favicon-v2-180.png',
+        'icons/poomsae-coach-v2-apple-touch.png',
+      ],
       manifest: {
         name: 'TeamPro Poomsae Score',
         short_name: '品勢計分',
@@ -31,11 +37,23 @@ export default defineConfig(({ command }) => ({
         background_color: '#05070c',
         theme_color: '#05070c',
         categories: ['sports', 'utilities'],
+        // 檔名的 v2 對應 scripts/generate-icons.mjs 的 VERSION，換圖示時一起加一號才吃得到
         icons: [
-          { src: 'icons/poomsae-coach-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: 'icons/poomsae-coach-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           {
-            src: 'icons/poomsae-coach-maskable-512.png',
+            src: 'icons/poomsae-coach-v2-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/poomsae-coach-v2-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            // maskable 版留了 14% 安全區，Android 圓形遮罩才不會把下面的字裁掉
+            src: 'icons/poomsae-coach-v2-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
