@@ -25,6 +25,46 @@
    - Region：**Southeast Asia (Singapore)** ← 台灣連過去延遲最低
 3. 等 2–3 分鐘建置完成
 
+### 如果卡在「exceeded their free project limits」
+
+Supabase 免費方案每個帳號上限 **2 個 active 專案**。不必付費，選一條：
+
+**A. 重用既有專案（推薦）**
+
+這份 schema 的所有物件都有 `competition_` 前綴，不會碰到既有的表。
+挑一個你已經在用的 TeamPro 專案，直接把 migration 跑上去即可，跳到步驟 2。
+
+跑之前先做一次衝突檢查（SQL Editor）：
+
+```sql
+-- 期望：0 rows。有結果代表同名物件已存在，先確認是不是舊版本的這份 schema
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+  and table_name in (
+    'competition_rooms', 'competition_room_secrets', 'competition_room_events'
+  );
+
+select routine_name
+from information_schema.routines
+where routine_schema = 'public'
+  and routine_name in (
+    'hash_room_token', 'verify_room_actor', 'create_competition_room',
+    'submit_room_event', 'save_room_snapshot', 'purge_expired_competition_rooms'
+  );
+```
+
+共用一個專案代表共用同一把 anon key —— 這是安全的，因為每張表都各自受 RLS 保護，
+本 schema 更是連直接寫入權限都沒開。
+
+**B. 暫停沒在用的專案**
+Dashboard → 該專案 → Settings → General → Pause project。之後要用再 Restore（資料保留）。
+
+**C. 刪掉沒在用的專案**
+確定資料不要了才做，**不可逆**。
+
+**D. 升級 Pro**（約 US$25/月）— 單一道館的用量用不到，不建議。
+
 ## 步驟 2：套用 schema
 
 1. 左側 **SQL Editor** → New query

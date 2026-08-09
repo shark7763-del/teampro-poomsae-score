@@ -15,8 +15,6 @@
 -- 把結果寫回 snapshot，規則就只有一份。
 -- ============================================================================
 
-create extension if not exists pgcrypto with schema extensions;
-
 -- ---------------------------------------------------------------- 房間 snapshot
 -- 這張表 anon 可讀。裡面的 snapshot 已在前端 sanitizeRoomState() 拿掉 token。
 create table if not exists public.competition_rooms (
@@ -100,13 +98,16 @@ grant select on public.competition_room_events to anon;
 -- 授權函式
 -- ============================================================================
 
+-- 用 Postgres 內建的 sha256()（PG 11+），不依賴 pgcrypto。
+-- 重用既有專案時，pgcrypto 可能裝在 public 而不是 extensions schema，
+-- 那樣 extensions.digest() 會找不到；內建函式沒有這個問題。
 create or replace function public.hash_room_token(p_token text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $$
-  select encode(extensions.digest(p_token, 'sha256'), 'hex');
+  select encode(pg_catalog.sha256(p_token::bytea), 'hex');
 $$;
 
 /**
