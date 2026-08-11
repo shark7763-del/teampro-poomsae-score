@@ -10,6 +10,20 @@ function appLink(path: string): string {
   return `${window.location.origin}${window.location.pathname}#${path}`
 }
 
+/**
+ * 場地標籤。
+ *
+ * 同時開兩個場地時，兩台電視除了六碼之外長得一模一樣，
+ * 教練很容易對著錯的螢幕講評。名稱由手機在配對時設定（顯示器名稱欄位）。
+ */
+function VenueLabel({ name, code }: { name: string; code: string }): React.ReactElement {
+  return (
+    <p className="tv-venue">
+      {name} · {code}
+    </p>
+  )
+}
+
 function formatTime(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
@@ -60,7 +74,7 @@ function TrainingDisplayWaiting({
       <section className="training-tv-wait">
         <div>
           <AppLogo />
-          <h1>Training Display</h1>
+          <h1>{state.displayName}</h1>
           <p className="display-meta">等待教練手機連接</p>
         </div>
         <div className="tv-code">{state.displayCode}</div>
@@ -89,6 +103,7 @@ function TrainingDisplayScreen({
       <main className="training-tv-shell">
         <section className="training-tv-result">
           <AppLogo />
+          <VenueLabel name={state.displayName} code={state.displayCode} />
           <h1>{state.athleteName}</h1>
           <p className="display-meta">
             {state.teamName} · {state.poomsaeName}
@@ -117,6 +132,7 @@ function TrainingDisplayScreen({
       <section className="training-tv-live">
         <div>
           <AppLogo />
+          <VenueLabel name={state.displayName} code={state.displayCode} />
           <h1>{state.athleteName}</h1>
           <p className="display-meta">
             {state.teamName} · {state.poomsaeName} · {state.phase}

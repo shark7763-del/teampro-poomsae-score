@@ -399,6 +399,18 @@ h1 {
   text-align: center;
 }
 
+/*
+ * 場地標籤。同時跑兩個場地時，兩台電視只差六碼，
+ * 遠距離要一眼分辨得出來，所以字級不能比 display-meta 小。
+ */
+.tv-venue {
+  color: #7ee3c4;
+  font-size: clamp(18px, 2.2vw, 32px);
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
 .tv-code {
   border: 2px solid #00c991;
   border-radius: 8px;

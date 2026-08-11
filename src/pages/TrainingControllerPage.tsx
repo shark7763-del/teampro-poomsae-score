@@ -107,6 +107,15 @@ export function TrainingControllerPage({
               開啟電視頁
             </Link>
           </div>
+          {/*
+            同時跑兩個場地時，兩台電視畫面只差六碼，遠看分不出來。
+            命名後電視會把名稱顯示在最上方。
+          */}
+          <TextField
+            label="場地名稱（電視上會顯示）"
+            value={state.displayName}
+            onChange={(displayName) => void controller.renameDisplay(displayName)}
+          />
         </div>
       </Panel>
 
