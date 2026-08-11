@@ -14,7 +14,24 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: 'phone-390', use: { ...devices['Pixel 5'], viewport: { width: 390, height: 844 } } },
-    { name: 'tv-1366', use: { viewport: { width: 1366, height: 768 } } },
+    /*
+     * 單裝置版面測試：每個檔案在兩種尺寸各跑一次。
+     * 多裝置測試自己開 context 並指定尺寸，跑兩次只會重複污染資料庫，所以排除。
+     */
+    {
+      name: 'phone-390',
+      testIgnore: /multi-device/,
+      use: { ...devices['Pixel 5'], viewport: { width: 390, height: 844 } },
+    },
+    {
+      name: 'tv-1366',
+      testIgnore: /multi-device/,
+      use: { viewport: { width: 1366, height: 768 } },
+    },
+    {
+      name: 'multi-device',
+      testMatch: /multi-device/,
+      use: { viewport: { width: 1366, height: 768 } },
+    },
   ],
 })

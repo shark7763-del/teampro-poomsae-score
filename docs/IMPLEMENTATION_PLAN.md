@@ -57,7 +57,7 @@
 - [x] Host token 存本機，重整後仍保有主控權；換裝置則明確拒絕
 - [x] **token 絕不進入共享 snapshot**（`sanitizeRoomState`），資料庫只存 SHA-256 hash
 
-### P0-4 Room Realtime Transport 🚧 程式碼完成，待憑證驗收
+### P0-4 Room Realtime Transport ✅（僅剩實體裝置斷網實測）
 
 - [x] 抽 `RoomTransport` 介面（比照 `TrainingRealtimeTransport`）
 - [x] `SupabaseRoomTransport`：RPC 寫入 + postgres_changes 訂閱 + 連線狀態回報
@@ -67,10 +67,10 @@
       + RLS + 三個 security definer 函式做伺服器端 token 驗證
 - [x] 權威模型：Host 跑 reducer 寫 snapshot，計分規則只有 TypeScript 一份
 - [x] Host 重整後由本機 token 復原主控權
-- [ ] **端對端驗收**（需要憑證，見 `SUPABASE_SETUP.md`）
-- [ ] Reconnect 實測：手機切 4G、鎖屏、Display refresh
-
-🟡 **待你完成 `docs/SUPABASE_SETUP.md` 的 6 個步驟**，這一項才能標成 ✅。
+- [x] **端對端驗收**：憑證已設定，資料層授權由外部 REST 實測通過
+      （讀 rooms 200／讀 secrets 401／繞過函式 INSERT 401／偽造 token 送分 401）
+- [x] Display refresh 後代碼不變（多裝置 E2E 覆蓋）
+- [ ] Reconnect 實測：手機切 4G、鎖屏（需實體裝置）
 
 ### P0-5 三角色 UI 拆分與重做 ⬜
 
@@ -86,9 +86,13 @@
 - [ ] 沒有 Supabase 憑證時，首頁明確顯示「本機模式，跨裝置不會同步」
 - [ ] 離線時顯示「目前離線，等待重新連線」，**不得假裝已同步**
 
-### P0-7 測試升級 ⬜
+### P0-7 測試升級 🚧
 
-- [ ] E2E 改用**多個獨立 browser context** 模擬不同裝置
+- [x] E2E 改用**多個獨立 browser context** 模擬不同裝置
+      （`tests/e2e/multi-device-venues.spec.ts`，playwright 新增 `multi-device` project）
+- [x] 兩個場地並行不互相污染：代碼不同、選手與扣分不會跨場地外洩
+- [x] 電視重整保持自己的代碼
+- [x] 守門測試：偵測到「本機模式」就失敗，避免退回假 realtime 還以為測過了
 - [ ] 情境：Host 建房 → 5 Judge 加入 → 送分 → Lock → Reveal → Next Athlete
 - [ ] 壓力：1 Host + 7 Judge + 1 Display，驗證無 race condition / duplicate / score lost
 - [ ] Reconnect 測試：中途 reload judge page，身分與已送分數還在

@@ -136,15 +136,26 @@ export function useTrainingController(initialSessionId?: string) {
     [makeEvent, publishEvent, senderId, transport],
   )
 
+  /**
+   * 命名場地。
+   *
+   * 這裡一定要 publish —— 只改手機本地狀態的話，電視永遠顯示預設名稱，
+   * 兩個場地同時跑時就分不出哪台是哪台。
+   */
   const renameDisplay = useCallback(
-    (displayName: string): void => {
-      const nextState = { ...sessionRef.current.state, displayName }
-      const nextSession = { ...sessionRef.current, state: nextState }
-      sessionRef.current = nextSession
-      setSession(nextSession)
+    async (displayName: string): Promise<void> => {
+      const current = sessionRef.current.state
+      const nextState = {
+        ...current,
+        displayName,
+        sequence: current.sequence + 1,
+        updatedAt: Date.now(),
+      }
+      applyAndPersist({ ...sessionRef.current, state: nextState })
       saveRecentDisplay(nextState.displayCode, displayName, nextState.sessionId)
+      await publishEvent(makeEvent({ type: 'DISPLAY_CONNECTED', payload: { displayName } }))
     },
-    [],
+    [applyAndPersist, makeEvent, publishEvent],
   )
 
   const updateTraining = useCallback(
@@ -292,9 +303,9 @@ async function resumeOrCreateDisplay(
       // 過期或已被清掉，往下建立新的
     }
   }
-  const created = await transport.createDisplay()
-  saveOwnDisplayCode(created.displayCode)
-  return created
+  // 刻意不在這裡寫入 localStorage：effect 可能被丟棄重跑（StrictMode、HMR），
+  // 那樣會存到沒有被採用的那組代碼，跟畫面顯示的不一致。由 boot() 確認存活後才存。
+  return transport.createDisplay()
 }
 
 export function useTrainingDisplay(displayCode?: string) {
@@ -316,6 +327,8 @@ export function useTrainingDisplay(displayCode?: string) {
           ? await transport.joinDisplay(displayCode)
           : await resumeOrCreateDisplay(transport)
         if (cancelled) return
+        // 這一次 boot 確定被採用了，才把代碼記成「這台電視的」
+        if (displayCode === undefined) saveOwnDisplayCode(created.displayCode)
         setSession(created)
         const initial =
           created.snapshot ??

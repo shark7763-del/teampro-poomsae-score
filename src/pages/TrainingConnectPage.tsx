@@ -20,7 +20,7 @@ export function TrainingConnectPage(): React.ReactElement {
     try {
       setError('')
       await controller.connectDisplay(normalizedCode)
-      controller.renameDisplay(displayName)
+      void controller.renameDisplay(displayName)
       setConnected(true)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '連接失敗')

@@ -115,6 +115,17 @@ export function TrainingControllerPage({
             label="場地名稱（電視上會顯示）"
             value={state.displayName}
             onChange={(displayName) => void controller.renameDisplay(displayName)}
+            /*
+              連線完成前不能改：此時事件帶的還是手機自己的 sessionId，
+              電視會直接丟棄，而且 connectDisplay 完成時會用電視端的名稱覆蓋回來，
+              打的字會無聲消失。
+            */
+            disabled={controller.connectionStatus !== 'connected'}
+            hint={
+              controller.connectionStatus === 'connected'
+                ? '兩個場地同時跑時，用這個分辨哪台電視'
+                : '連線完成後才能命名'
+            }
           />
         </div>
       </Panel>

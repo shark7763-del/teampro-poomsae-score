@@ -70,19 +70,25 @@ export function TextField({
   label,
   value,
   onChange,
+  disabled = false,
+  hint,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
+  disabled?: boolean
+  hint?: string
 }): React.ReactElement {
   return (
     <label className="flex flex-col gap-1 text-sm font-bold text-slate-300">
       {label}
       <input
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-[48px] rounded-lg border border-line bg-panel-2 px-3 text-white outline-none focus:border-emerald-400"
+        className="min-h-[48px] rounded-lg border border-line bg-panel-2 px-3 text-white outline-none focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
       />
+      {hint ? <span className="text-xs font-normal text-slate-400">{hint}</span> : null}
     </label>
   )
 }
