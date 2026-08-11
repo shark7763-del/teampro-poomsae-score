@@ -9,7 +9,14 @@ import {
   sanitizeTrainingDisplayState,
   updateOptionsForMode,
 } from './state'
-import { loadRecentDisplay, loadTrainingSnapshot, saveRecentDisplay, saveTrainingSnapshot } from './storage'
+import {
+  loadOwnDisplayCode,
+  loadRecentDisplay,
+  loadTrainingSnapshot,
+  saveOwnDisplayCode,
+  saveRecentDisplay,
+  saveTrainingSnapshot,
+} from './storage'
 import { createTrainingTransport } from './transport'
 import type {
   DisplayMode,
@@ -267,6 +274,29 @@ export function useTrainingController(initialSessionId?: string) {
   }
 }
 
+/**
+ * 電視在沒帶代碼時，先試著接回自己上一次的顯示器。
+ *
+ * 直接 createDisplay() 會讓每次重整都換一組新代碼，
+ * 手機既有的配對就斷了 —— 現場碰到遙控器就要重配對。
+ * 代碼過期或找不到才建立新的。
+ */
+async function resumeOrCreateDisplay(
+  transport: ReturnType<typeof createTrainingTransport>,
+): Promise<TrainingDisplaySession> {
+  const saved = loadOwnDisplayCode()
+  if (saved !== null) {
+    try {
+      return await transport.joinDisplay(saved)
+    } catch {
+      // 過期或已被清掉，往下建立新的
+    }
+  }
+  const created = await transport.createDisplay()
+  saveOwnDisplayCode(created.displayCode)
+  return created
+}
+
 export function useTrainingDisplay(displayCode?: string) {
   const transport = useMemo(() => createTrainingTransport(), [])
   const [state, setState] = useState<TrainingDisplayState | null>(null)
@@ -282,7 +312,9 @@ export function useTrainingDisplay(displayCode?: string) {
     let cancelled = false
     async function boot(): Promise<void> {
       try {
-        const created = displayCode ? await transport.joinDisplay(displayCode) : await transport.createDisplay()
+        const created = displayCode
+          ? await transport.joinDisplay(displayCode)
+          : await resumeOrCreateDisplay(transport)
         if (cancelled) return
         setSession(created)
         const initial =

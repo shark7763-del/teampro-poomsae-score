@@ -60,3 +60,23 @@ export function loadRecentDisplay(): { displayCode: string; displayName: string;
   }
   return null
 }
+
+const OWN_DISPLAY_KEY = 'teampro-poomsae:tv-own-display-code'
+
+/**
+ * 這台電視自己的顯示器代碼。
+ *
+ * 沒有這份紀錄的話，停在 /tv 等待畫面時每重整一次就 createDisplay() 一次，
+ * 產生新代碼並讓手機既有的配對失效 —— 現場只要有人不小心碰到遙控器就斷線。
+ */
+export function saveOwnDisplayCode(displayCode: string): void {
+  localStorage.setItem(OWN_DISPLAY_KEY, displayCode)
+}
+
+export function loadOwnDisplayCode(): string | null {
+  return localStorage.getItem(OWN_DISPLAY_KEY)
+}
+
+export function clearOwnDisplayCode(): void {
+  localStorage.removeItem(OWN_DISPLAY_KEY)
+}
